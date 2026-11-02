@@ -159,7 +159,7 @@ def build(history: bool = True) -> None:
 async def _run_history(plans: list[tuple[int, list[str], int]]) -> None:
     for plan_id, script, days_ago_rank in plans:
         conv, _ = await run_scripted_call(plan_id, script, offline=True)
-        _backdate(conv.session.call.id, days=days_ago_rank * 3 + random.randint(0, 2))
+        _backdate(conv.session.call.id, days=days_ago_rank * 2 + random.randint(0, 1))
 
 
 def _backdate(call_id: int, days: int) -> None:
@@ -174,7 +174,8 @@ def _backdate(call_id: int, days: int) -> None:
         for model, field in ((Report, "created_at"), (TriageEvent, "created_at"), (MedAdherence, "recorded_at"), (Answer, "created_at")):
             for row in db.exec(select(model).where(model.call_id == call_id)).all():
                 setattr(row, field, getattr(row, field) - shift)
-                if isinstance(row, TriageEvent) and days > 2:
+                # Older alerts were already handled; the latest ones stay open on the board.
+                if isinstance(row, TriageEvent) and days >= 4:
                     row.acked_by, row.acked_at = "nurse.demo", row.created_at + timedelta(minutes=12)
                 db.add(row)
         db.commit()
