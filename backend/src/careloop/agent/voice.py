@@ -79,9 +79,11 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
     from pipecat.transports.base_transport import TransportParams
     from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
     from pipecat.workers.runner import WorkerRunner
-    from pipecat_gnani import GnaniSTTService, GnaniTTSService
+    from pipecat_gnani import GnaniSTTService
 
     from pipecat.frames.frames import FunctionCallResultProperties
+
+    from careloop.agent.tts import SentenceSafeGnaniTTS
 
     s = CallSession(call_id)
     older = (s.patient.age or 0) >= 60
@@ -92,7 +94,7 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     )
     stt = GnaniSTTService(api_key=settings.gnani_api_key, settings=_stt_settings(s))
-    tts = GnaniTTSService(api_key=settings.gnani_api_key, settings=_tts_settings(s))
+    tts = SentenceSafeGnaniTTS(api_key=settings.gnani_api_key, settings=_tts_settings(s))
     llm = OpenAILLMService(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,

@@ -87,6 +87,7 @@ class CallSession:
         self.latencies_ms: list[float] = []
         self.ended = False
         self.end_reason: str | None = None
+        self.end_refused = False
         self.started_monotonic = time.monotonic()
         self.finalized = False
 
@@ -397,10 +398,17 @@ class CallSession:
         return {"ok": True, "instruction": f"From now on speak only {lang(language).english_name} ({lang(language).native_name})."}
 
     def tool_end_call(self, reason: str = "completed") -> dict[str, Any]:
-        if reason not in EARLY_END_REASONS and self.unanswered and self.elapsed_seconds < settings.max_call_seconds:
+        # Refuse once so a skipped question gets asked; a second attempt always ends the call,
+        # otherwise a model that has already said goodbye leaves the patient on an open line.
+        if (reason not in EARLY_END_REASONS and self.unanswered and not self.end_refused
+                and self.elapsed_seconds < settings.max_call_seconds):
+            self.end_refused = True
             return {
                 "ok": False,
-                "error": "Questions are still unanswered. Ask them, or record them as declined/unclear, then call end_call again.",
+                "error": (
+                    "Questions are still unanswered. If the patient already answered one, call record_answer for it "
+                    "now. Otherwise ask it, or record it as declined/unclear. Then call end_call again."
+                ),
                 "remaining": {k: self.pack.question(k).ask for k in self.unanswered},
             }
         self.ended = True
