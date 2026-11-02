@@ -31,7 +31,7 @@ class Settings:
     # Dialogue LLM: any OpenAI-compatible chat completions endpoint (DeepInfra by default)
     llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("DEEPINFRA_API_KEY")
     llm_base_url: str = os.getenv("LLM_BASE_URL", "https://api.deepinfra.com/v1/openai")
-    llm_model: str = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash")
+    llm_model: str = os.getenv("LLM_MODEL", "google/gemma-4-26B-A4B-it")
     # Hybrid models think before answering unless told not to; a phone call can't wait for that.
     # Empty sends nothing, for providers that reject the field.
     llm_reasoning_effort: str = os.getenv("LLM_REASONING_EFFORT", "none")
