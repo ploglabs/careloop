@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, Keyboard, Mic, MicOff, Phone, PhoneOff, Send } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes } from "react";
+import { ChevronDown, Globe, Keyboard, Mic, MicOff, Phone, PhoneOff, Send } from "lucide-react";
 import { API_URL, wsUrl } from "@/lib/api";
 import { cx } from "@/components/ui";
 
@@ -25,7 +25,8 @@ async function fetchInfo(token: string): Promise<Info> {
   return res.json();
 }
 
-type Line = { who: "agent" | "patient" | "system"; text: string };
+// `id` lets a streamed bot bubble be updated in place instead of appended again.
+type Line = { id?: string; who: "agent" | "patient" | "system"; text: string };
 type Phase = "idle" | "connecting" | "live" | "ended" | "error";
 
 export default function CallPage() {
@@ -57,7 +58,14 @@ export default function CallPage() {
     };
   }, [phase, token]);
 
-  const add = useCallback((l: Line) => setLines((ls) => [...ls, l]), []);
+  const add = useCallback(
+    (l: Line) =>
+      setLines((ls) => {
+        const i = l.id ? ls.findIndex((x) => x.id === l.id) : -1;
+        return i < 0 ? [...ls, l] : ls.map((x, j) => (j === i ? l : x));
+      }),
+    [],
+  );
 
   const decline = async () => {
     await fetch(`${API_URL}/api/call/${token}/decline`, { method: "POST" });
@@ -66,26 +74,36 @@ export default function CallPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
-      <div className="flex h-[min(780px,calc(100vh-2rem))] w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border border-border bg-surface shadow-xl">
-        <header className="flex items-center gap-2 border-b border-border px-5 py-3 text-xs text-muted">
-          <Activity size={14} className="text-accent" />
-          <span className="font-medium text-text">CareLoop</span>
-          <span className="ml-auto truncate">{info?.clinic}</span>
+    <div className="flex min-h-dvh items-center justify-center bg-bg p-4">
+      <div className="flex h-[min(800px,calc(100dvh-2rem))] w-full max-w-[400px] flex-col overflow-hidden rounded-[28px] border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <header className="flex items-center gap-3 px-6 pb-3 pt-5">
+          <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="" width={20} height={20} className="h-5 w-5" />
+            CareLoop
+          </span>
+          <span className="ml-auto truncate text-xs text-muted">{info?.clinic}</span>
         </header>
 
-        {error && <p className="m-5 rounded-lg bg-emergency-soft p-3 text-sm text-emergency">{error}</p>}
+        {error && <p className="mx-5 rounded-xl bg-emergency-soft p-3 text-sm text-emergency">{error}</p>}
 
         {info && phase === "idle" && !mode && (
           <Incoming info={info} language={language} setLanguage={setLanguage} onAnswer={(m) => setMode(m)} onDecline={decline} />
         )}
 
-        {mode === "voice" && <VoiceCall token={token} language={language} lines={lines} add={add} phase={phase} setPhase={setPhase} />}
-        {mode === "text" && <TextCall token={token} language={language} lines={lines} add={add} phase={phase} setPhase={setPhase} />}
+        {mode && info && (
+          <div className="animate-fade flex min-h-0 flex-1 flex-col">
+            {mode === "voice" ? (
+              <VoiceCall token={token} info={info} language={language} lines={lines} add={add} phase={phase} setPhase={setPhase} />
+            ) : (
+              <TextCall token={token} info={info} language={language} lines={lines} add={add} phase={phase} setPhase={setPhase} />
+            )}
+          </div>
+        )}
         {!mode && phase === "ended" && <Transcript lines={lines} />}
 
-        <footer className="border-t border-border px-5 py-2 text-center text-[10px] text-faint">
-          Automated assistant · not for emergencies, call 108 · synthetic demo
+        <footer className="px-6 pb-4 pt-2 text-center text-[11px] leading-snug text-faint">
+          Automated assistant, not for emergencies. Call 108 · Synthetic demo
         </footer>
       </div>
     </div>
@@ -96,76 +114,138 @@ function Incoming({ info, language, setLanguage, onAnswer, onDecline }: {
   info: Info; language: string; setLanguage: (l: string) => void; onAnswer: (m: "voice" | "text") => void; onDecline: () => void;
 }) {
   if (!info.answerable) {
-    return <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted">This follow-up is already complete. Thank you, {info.first_name}.</div>;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+        <p className="text-base font-medium">You&apos;re all done</p>
+        <p className="text-sm text-muted">This check-in is already complete. Thank you, {info.first_name}.</p>
+      </div>
+    );
   }
   return (
-    <div className="flex flex-1 flex-col items-center px-6 py-8 text-center">
-      <p className="text-xs uppercase tracking-widest text-faint">{info.ringing ? "Incoming call" : "Follow-up check-in"}</p>
-      <div className={cx("mt-8 grid h-24 w-24 place-items-center rounded-full bg-accent-soft text-accent", info.ringing && "animate-ring")}>
-        <Phone size={36} />
-      </div>
-      <h1 className="mt-6 text-xl font-semibold">{info.clinic}</h1>
-      <p className="mt-1 text-sm text-muted">Hi {info.first_name}, a 2-minute check-in on how you are recovering.</p>
+    <div className="flex flex-1 flex-col items-center px-6 pt-6 text-center">
+      <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-muted">
+        <span className={cx("h-1.5 w-1.5 rounded-full", info.ringing ? "bg-routine" : "bg-faint")} />
+        {info.ringing ? "Incoming call" : "Follow-up check-in"}
+      </span>
 
-      <label className="mt-8 w-full text-left text-xs text-muted">
-        Language
-        <select value={language} onChange={(e) => setLanguage(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text">
+      <div className={cx("mt-10 grid h-28 w-28 place-items-center rounded-full border border-border bg-surface-2 text-text", info.ringing && "animate-ring")}>
+        <Phone size={40} strokeWidth={1.75} />
+      </div>
+
+      <h1 className="mt-8 text-[22px] font-semibold leading-tight tracking-tight text-balance">{info.clinic}</h1>
+      <p className="mt-2 max-w-[280px] text-[15px] leading-relaxed text-muted text-pretty">
+        Hi {info.first_name}, a 2-minute check-in on how you are recovering.
+      </p>
+
+      <label className="relative mt-8 w-full">
+        <span className="sr-only">Language</span>
+        <Globe size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="h-12 w-full appearance-none rounded-2xl border border-border bg-surface pl-11 pr-10 text-[15px] text-text outline-none transition-[border-color] duration-150 focus:border-accent"
+        >
           {info.languages.map((l) => <option key={l.code} value={l.code}>{l.native} · {l.name}</option>)}
         </select>
+        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted" />
       </label>
 
-      <div className="mt-auto flex w-full items-end justify-around pt-8">
-        <button onClick={onDecline} className="flex flex-col items-center gap-2 text-xs text-muted">
-          <span className="grid h-14 w-14 place-items-center rounded-full bg-emergency text-white"><PhoneOff size={22} /></span>
-          Decline
-        </button>
-        <button onClick={() => onAnswer("text")} className="flex flex-col items-center gap-2 text-xs text-muted">
-          <span className="grid h-14 w-14 place-items-center rounded-full border border-border bg-surface-2 text-text"><Keyboard size={22} /></span>
-          Text
-        </button>
-        <button
+      <div className="mt-auto grid w-full grid-cols-3 pb-6 pt-10">
+        <CallAction label="Decline" onClick={onDecline} className="bg-emergency text-white">
+          <PhoneOff size={24} />
+        </CallAction>
+        <CallAction label="Text" onClick={() => onAnswer("text")} className="border border-border bg-surface-2 text-text">
+          <Keyboard size={24} />
+        </CallAction>
+        <CallAction
+          label="Answer"
           onClick={() => onAnswer("voice")}
           disabled={!info.voice_enabled}
           title={info.voice_enabled ? undefined : "Voice needs GNANI_API_KEY and LLM_API_KEY on the server"}
-          className="flex flex-col items-center gap-2 text-xs text-muted disabled:opacity-40"
+          className="bg-accent text-white"
         >
-          <span className="grid h-14 w-14 place-items-center rounded-full bg-routine text-white"><Phone size={22} /></span>
-          Answer
-        </button>
+          <Phone size={24} />
+        </CallAction>
       </div>
-      {!info.voice_enabled && <p className="mt-3 text-[11px] text-faint">Voice is off on this server (no API keys). Text works offline.</p>}
+      {!info.voice_enabled && <p className="-mt-2 pb-4 text-xs text-faint">Voice is off on this server. Text works offline.</p>}
     </div>
+  );
+}
+
+function CallAction({ label, className, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button {...props} className="press flex flex-col items-center gap-2 text-xs font-medium text-muted disabled:opacity-40">
+      <span className={cx("grid h-16 w-16 place-items-center rounded-full", className)}>{children}</span>
+      {label}
+    </button>
   );
 }
 
 function Transcript({ lines, typing }: { lines: Line[]; typing?: boolean }) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [lines, typing]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [lines, typing]);
   return (
-    <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+    <div className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4 [scrollbar-width:thin]">
       {lines.map((l, i) =>
         l.who === "system" ? (
-          <p key={i} className="py-1 text-center text-xs text-faint">{l.text}</p>
+          <p key={l.id ?? i} className="animate-bubble py-2 text-center text-xs text-faint">{l.text}</p>
         ) : (
-          <div key={i} className={cx("flex", l.who === "patient" ? "justify-end" : "justify-start")}>
-            <div className={cx("animate-in max-w-[85%] rounded-2xl px-3 py-2 text-sm", l.who === "patient" ? "rounded-br-sm bg-accent text-white dark:text-black" : "rounded-bl-sm bg-surface-2")}>
+          <div key={l.id ?? i} className={cx("flex", l.who === "patient" ? "justify-end" : "justify-start")}>
+            <div
+              className={cx(
+                "animate-bubble max-w-[85%] whitespace-pre-wrap rounded-[20px] px-4 py-2.5 text-[15px] leading-relaxed",
+                l.who === "patient" ? "rounded-br-md bg-accent text-white" : "rounded-bl-md bg-surface-2 text-text",
+              )}
+            >
               {l.text}
             </div>
           </div>
         ),
       )}
-      {typing && <div className="text-xs text-faint">…</div>}
+      {typing && (
+        <div className="flex">
+          <div className="typing flex gap-1 rounded-[20px] rounded-bl-md bg-surface-2 px-4 py-3.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted" />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted" />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted" />
+          </div>
+        </div>
+      )}
       <div ref={end} />
     </div>
   );
 }
 
-type CallProps = { token: string; language: string; lines: Line[]; add: (l: Line) => void; phase: Phase; setPhase: (p: Phase) => void };
+function useElapsed(phase: Phase) {
+  const started = useRef<number | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (phase !== "live") return;
+    started.current ??= Date.now();
+    const t = setInterval(() => setSeconds(Math.floor((Date.now() - started.current!) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
-function TextCall({ token, language, lines, add, phase, setPhase }: CallProps) {
+function CallEnded({ info, elapsed }: { info: Info; elapsed: string }) {
+  return (
+    <div className="animate-bubble border-t border-border px-6 py-5 text-center">
+      <p className="text-sm font-medium">Call ended · {elapsed}</p>
+      <p className="mt-1 text-xs text-muted">Thank you, {info.first_name}. Your care team will review this.</p>
+    </div>
+  );
+}
+
+type CallProps = { token: string; info: Info; language: string; lines: Line[]; add: (l: Line) => void; phase: Phase; setPhase: (p: Phase) => void };
+
+function TextCall({ token, info, language, lines, add, phase, setPhase }: CallProps) {
   const ws = useRef<WebSocket | null>(null);
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState("");
+  const elapsed = useElapsed(phase);
 
   useEffect(() => {
     setPhase("connecting");
@@ -182,7 +262,6 @@ function TextCall({ token, language, lines, add, phase, setPhase }: CallProps) {
       if (msg.type === "error") add({ who: "system", text: msg.text });
       if (msg.type === "ended") {
         setTyping(false);
-        add({ who: "system", text: "Call ended" });
         setPhase("ended");
       }
     };
@@ -200,16 +279,26 @@ function TextCall({ token, language, lines, add, phase, setPhase }: CallProps) {
   return (
     <>
       <Transcript lines={lines} typing={typing} />
-      {phase !== "ended" && (
-        <div className="border-t border-border p-3">
-          <div className="mb-2 flex gap-1.5">
+      {phase === "ended" ? (
+        <CallEnded info={info} elapsed={elapsed} />
+      ) : (
+        <div className="border-t border-border px-4 pb-2 pt-3">
+          <div className="mb-2.5 flex gap-2">
             {["Yes", "No"].map((q) => (
-              <button key={q} onClick={() => send(q)} className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:bg-surface-2">{q}</button>
+              <button key={q} onClick={() => send(q)} className="press rounded-full border border-border px-4 py-1.5 text-sm text-muted hover:bg-surface-2">{q}</button>
             ))}
           </div>
           <form onSubmit={(e) => { e.preventDefault(); send(text); }} className="flex gap-2">
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type your reply" className="h-10 flex-1 rounded-xl border border-border bg-surface px-3 text-sm" autoFocus />
-            <button className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white dark:text-black" aria-label="Send"><Send size={16} /></button>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your reply"
+              className="h-12 flex-1 rounded-2xl border border-border bg-surface px-4 text-[15px] outline-none transition-[border-color] duration-150 focus:border-accent"
+              autoFocus
+            />
+            <button disabled={!text.trim()} className="press grid h-12 w-12 place-items-center rounded-2xl bg-accent text-white disabled:opacity-40" aria-label="Send">
+              <Send size={18} />
+            </button>
           </form>
         </div>
       )}
@@ -217,16 +306,19 @@ function TextCall({ token, language, lines, add, phase, setPhase }: CallProps) {
   );
 }
 
-function VoiceCall({ token, language, lines, add, phase, setPhase }: CallProps) {
+function VoiceCall({ token, info, language, lines, add, phase, setPhase }: CallProps) {
   const client = useRef<import("@pipecat-ai/client-js").PipecatClient | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const [speaking, setSpeaking] = useState<"bot" | "user" | null>(null);
   const [muted, setMuted] = useState(false);
-  const botOpen = useRef(false);
-  const [lastBot, setLastBot] = useState<string>("");
+  const elapsed = useElapsed(phase);
+  // The bot bubble being filled. Pipecat reports a sentence when it is queued and again when
+  // spoken, so sentences are keyed by segment id and each is shown once.
+  const bubble = useRef<{ id: string; segments: Map<string, string> } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let n = 0;
     (async () => {
       setPhase("connecting");
       const [{ PipecatClient }, { SmallWebRTCTransport }] = await Promise.all([
@@ -240,9 +332,11 @@ function VoiceCall({ token, language, lines, add, phase, setPhase }: CallProps) 
         callbacks: {
           onConnected: () => setPhase("live"),
           onDisconnected: () => {
+            setSpeaking(null);
             setPhase("ended");
-            add({ who: "system", text: "Call ended" });
           },
+          // The server ends the call after its closing line: hang up our side too.
+          onBotDisconnected: () => pc.disconnect(),
           onTrackStarted: (track, participant) => {
             if (!participant?.local && track.kind === "audio" && audio.current) {
               audio.current.srcObject = new MediaStream([track]);
@@ -250,24 +344,23 @@ function VoiceCall({ token, language, lines, add, phase, setPhase }: CallProps) 
             }
           },
           onBotStartedSpeaking: () => {
-            botOpen.current = false;
+            bubble.current = null;
             setSpeaking("bot");
           },
           onBotStoppedSpeaking: () => setSpeaking(null),
           onUserStartedSpeaking: () => setSpeaking("user"),
           onUserStoppedSpeaking: () => setSpeaking(null),
           onUserTranscript: (d) => {
-            if (d.final) add({ who: "patient", text: d.text });
+            if (!d.final) return;
+            bubble.current = null;
+            add({ who: "patient", text: d.text });
           },
           onBotOutput: (d) => {
-            if (!d.text?.trim()) return;
-            if (!botOpen.current) {
-              botOpen.current = true;
-              setLastBot(d.text);
-              add({ who: "agent", text: d.text });
-            } else {
-              setLastBot((t) => `${t} ${d.text}`);
-            }
+            const text = d.text?.trim();
+            if (!text) return;
+            bubble.current ??= { id: `bot-${n++}`, segments: new Map() };
+            bubble.current.segments.set(d.segment_id != null ? String(d.segment_id) : text, text);
+            add({ id: bubble.current.id, who: "agent", text: [...bubble.current.segments.values()].join(" ") });
           },
           onError: (e) => add({ who: "system", text: `Error: ${JSON.stringify(e.data ?? e)}` }),
         },
@@ -288,37 +381,60 @@ function VoiceCall({ token, language, lines, add, phase, setPhase }: CallProps) 
     };
   }, [token, language, add, setPhase]);
 
-  // Merge streamed bot output into its bubble.
-  const shown = lines.map((l, i) => (i === lines.length - 1 && l.who === "agent" && lastBot ? { ...l, text: lastBot } : l));
+  const status =
+    phase === "connecting" ? "Connecting…"
+    : phase === "error" ? "Couldn't connect"
+    : phase === "ended" ? "Call ended"
+    : speaking === "bot" ? "Speaking"
+    : speaking === "user" ? "Listening"
+    : muted ? "Muted" : "Your turn";
 
   return (
     <>
       <audio ref={audio} autoPlay />
-      <div className="flex flex-col items-center gap-2 border-b border-border py-5">
-        <div className={cx("grid h-16 w-16 place-items-center rounded-full", speaking === "bot" ? "animate-ring bg-accent text-white dark:text-black" : speaking === "user" ? "bg-routine text-white" : "bg-accent-soft text-accent")}>
-          <Activity size={26} />
+      <div className="flex items-center gap-4 border-b border-border px-6 pb-4 pt-2">
+        <div
+          className={cx(
+            "grid h-14 w-14 shrink-0 place-items-center rounded-full transition-colors duration-200",
+            speaking === "bot" ? "bg-accent text-white" : "border border-border bg-surface-2 text-text",
+          )}
+        >
+          <div className={cx("flex h-6 items-center gap-[3px]", speaking === "bot" && "eq")}>
+            {[0.5, 0.9, 0.7, 0.4].map((h, i) => (
+              <span key={i} className="w-[3px] rounded-full bg-current" style={{ height: `${h * 100}%` }} />
+            ))}
+          </div>
         </div>
-        <p className="text-xs text-muted">
-          {phase === "connecting" ? "Connecting…" : phase === "live" ? (speaking === "bot" ? "CareLoop is speaking" : speaking === "user" ? "Listening…" : "Connected") : phase === "error" ? "Couldn't connect" : "Call ended"}
-        </p>
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-medium">Care assistant</p>
+          <p className="text-sm text-muted">
+            <span className={cx(speaking === "user" && "text-text", phase === "error" && "text-emergency")}>{status}</span>
+            {phase !== "connecting" && phase !== "error" && <span className="tabular-nums text-faint"> · {elapsed}</span>}
+          </p>
+        </div>
       </div>
-      <Transcript lines={shown} />
-      {phase === "live" && (
-        <div className="flex justify-center gap-6 border-t border-border p-4">
-          <button
+
+      <Transcript lines={lines} />
+
+      {phase === "live" || phase === "connecting" ? (
+        <div className="flex justify-center gap-10 border-t border-border px-6 py-4">
+          <CallAction
+            label={muted ? "Unmute" : "Mute"}
+            disabled={phase !== "live"}
             onClick={() => {
               client.current?.enableMic(muted);
               setMuted(!muted);
             }}
-            className="grid h-12 w-12 place-items-center rounded-full border border-border bg-surface-2"
-            aria-label={muted ? "Unmute" : "Mute"}
+            className={muted ? "bg-text text-surface" : "border border-border bg-surface-2 text-text"}
           >
-            {muted ? <MicOff size={20} /> : <Mic size={20} />}
-          </button>
-          <button onClick={() => client.current?.disconnect()} className="grid h-12 w-12 place-items-center rounded-full bg-emergency text-white" aria-label="Hang up">
-            <PhoneOff size={20} />
-          </button>
+            {muted ? <MicOff size={22} /> : <Mic size={22} />}
+          </CallAction>
+          <CallAction label="End" onClick={() => client.current?.disconnect()} className="bg-emergency text-white">
+            <PhoneOff size={22} />
+          </CallAction>
         </div>
+      ) : (
+        phase === "ended" && <CallEnded info={info} elapsed={elapsed} />
       )}
     </>
   );

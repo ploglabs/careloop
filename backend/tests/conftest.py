@@ -6,7 +6,7 @@ _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["CARELOOP_SCHEDULER"] = "0"
 os.environ["LLM_API_KEY"] = ""
-os.environ["GROQ_API_KEY"] = ""
+os.environ["DEEPINFRA_API_KEY"] = ""
 os.environ["GNANI_API_KEY"] = ""
 
 import pytest  # noqa: E402

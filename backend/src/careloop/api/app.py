@@ -11,6 +11,9 @@ from careloop.db import init_db
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    from careloop.scheduler import recover_orphaned_calls
+
+    recover_orphaned_calls()  # no call session survives a restart
     scheduler = None
     if settings.scheduler_enabled:
         from careloop.scheduler import start_scheduler

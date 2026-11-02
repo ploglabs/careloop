@@ -41,10 +41,14 @@ class LLMBrain:
         for _ in range(MAX_TOOL_ROUNDS):
             resp = await self.client.chat.completions.create(
                 model=settings.llm_model, messages=self.messages, tools=openai_tools(), temperature=0.3,
+                extra_body=settings.llm_extra_body,
             )
             msg = resp.choices[0].message
-            if msg.content and msg.content.strip():
-                out.append(msg.content.strip())
+            text = (msg.content or "").strip()
+            ending = any(tc.function.name == "end_call" for tc in msg.tool_calls or [])
+            # A goodbye written alongside end_call would be spoken twice; the scripted closing replaces it.
+            if text and not ending:
+                out.append(text)
             if not msg.tool_calls:
                 self.messages.append({"role": "assistant", "content": msg.content or ""})
                 break
@@ -67,7 +71,25 @@ class LLMBrain:
                     return out
                 if result.get("say_exactly"):
                     out.append(result["say_exactly"])
+            if asks_patient(text):
+                # The model already asked something; wait for the answer instead of acting on a guess.
+                break
+        if not out and not s.ended:
+            # Some models stop after a tool call without saying anything. Silence on a call is worse
+            # than an extra round trip, so ask once more for the spoken reply, without tools.
+            self.messages.append({"role": "system", "content": "Now say your next sentence to the patient, in the call language."})
+            resp = await self.client.chat.completions.create(
+                model=settings.llm_model, messages=self.messages, temperature=0.3, extra_body=settings.llm_extra_body,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+            if text:
+                out.append(text)
+                self.messages.append({"role": "assistant", "content": text})
         return out
+
+
+def asks_patient(text: str | None) -> bool:
+    return bool(text) and "?" in text.strip()[-3:]
 
 
 def review_call(s: CallSession) -> dict[str, Any] | None:
@@ -95,6 +117,7 @@ Be conservative: if anything suggests a dangerous symptom, choose the higher lev
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0,
+        extra_body=settings.llm_extra_body,
     )
     data = json.loads(resp.choices[0].message.content or "{}")
     if data.get("level", "ROUTINE").upper() not in Urgency.__members__:

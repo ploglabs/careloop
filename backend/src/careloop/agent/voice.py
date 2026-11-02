@@ -13,7 +13,7 @@ from typing import Any
 
 from loguru import logger
 
-from careloop.agent.brain import review_call
+from careloop.agent.brain import asks_patient, review_call
 from careloop.agent.prompts import system_prompt
 from careloop.agent.session import CallSession
 from careloop.agent.tools import TOOL_SPECS, pipecat_tools
@@ -79,9 +79,11 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
     from pipecat.transports.base_transport import TransportParams
     from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
     from pipecat.workers.runner import WorkerRunner
-    from pipecat_gnani import GnaniSTTService, GnaniTTSService
+    from pipecat_gnani import GnaniSTTService
 
     from pipecat.frames.frames import FunctionCallResultProperties
+
+    from careloop.agent.tts import SentenceSafeGnaniTTS
 
     s = CallSession(call_id)
     older = (s.patient.age or 0) >= 60
@@ -92,11 +94,13 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
         params=TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     )
     stt = GnaniSTTService(api_key=settings.gnani_api_key, settings=_stt_settings(s))
-    tts = GnaniTTSService(api_key=settings.gnani_api_key, settings=_tts_settings(s))
+    tts = SentenceSafeGnaniTTS(api_key=settings.gnani_api_key, settings=_tts_settings(s))
     llm = OpenAILLMService(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
-        settings=OpenAILLMService.Settings(model=settings.llm_model, temperature=0.3),
+        settings=OpenAILLMService.Settings(
+            model=settings.llm_model, temperature=0.3, extra={"extra_body": settings.llm_extra_body},
+        ),
     )
 
     opening = s.start(mode="voice")
@@ -165,6 +169,9 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
             if name == "end_call" and result.get("ok"):
                 run_llm = False
                 await end_call(result.get("closing_line"))
+            elif s.transcript and s.transcript[-1]["role"] == "assistant" and asks_patient(s.transcript[-1]["text"]):
+                # The bot just asked the patient something; wait for the answer before speaking again.
+                run_llm = False
             await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=run_llm))
 
         return handler
@@ -219,6 +226,6 @@ def voice_ready() -> tuple[bool, str]:
     if not settings.gnani_api_key:
         return False, "GNANI_API_KEY is not set"
     if not settings.llm_api_key:
-        return False, "LLM_API_KEY (or GROQ_API_KEY) is not set"
+        return False, "LLM_API_KEY (or DEEPINFRA_API_KEY) is not set"
     os.environ.setdefault("GNANI_API_KEY", settings.gnani_api_key)
     return True, "ok"

@@ -100,7 +100,29 @@ def mark_no_answer(call_id: int) -> None:
                                 "plan_status": plan.status, "attempts": plan.attempts})
 
 
+def recover_orphaned_calls(older_than: timedelta = timedelta(0)) -> None:
+    """Close calls left "connected" with no live session (server restart, crashed transport) so the plan can be rung again."""
+    cutoff = utcnow() - older_than
+    with session_scope() as db:
+        orphans = db.exec(
+            select(Call).where(Call.status == CallStatus.CONNECTED,
+                               or_(col(Call.started_at).is_(None), col(Call.started_at) <= cutoff))
+        ).all()
+        for call in orphans:
+            call.status = CallStatus.PARTIAL
+            call.ended_at = utcnow()
+            db.add(call)
+            plan = db.get(FollowupPlan, call.plan_id)
+            if plan and plan.status == PlanStatus.IN_PROGRESS:
+                plan.status = PlanStatus.RETRY
+                plan.next_attempt_at = utcnow() + timedelta(minutes=settings.retry_interval_minutes)
+                db.add(plan)
+            logger.warning(f"recovered orphaned call {call.id} (plan {call.plan_id})")
+        db.commit()
+
+
 def tick() -> None:
+    recover_orphaned_calls(timedelta(seconds=settings.max_call_seconds * 2))
     now = utcnow()
     with session_scope() as db:
         due = db.exec(

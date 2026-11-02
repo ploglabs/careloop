@@ -8,6 +8,7 @@ Every hit records which rule fired and the patient's words that triggered it.
 """
 
 import re
+from functools import lru_cache
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,6 +18,8 @@ from careloop.triage.lexicon import CLAUSE_BREAKS, NEGATIONS, RED_FLAGS
 from careloop.triage.rules import evaluate
 
 NEGATION_WINDOW_TOKENS = 4
+# Hindi and the Dravidian languages put the negation at the end of the clause, after the symptom.
+NEGATION_WINDOW_AFTER = 6
 
 
 @dataclass(frozen=True)
@@ -63,25 +66,34 @@ def _is_negation(token: str) -> bool:
     return False
 
 
-def _find(term: str, clause: str) -> list[tuple[int, int]]:
+# Up to two filler words may sit inside a multi-word phrase: "सांस लेने में भी बहुत तकलीफ",
+# "difficulty in breathing".
+_GAP = r"\s+(?:\S+\s+){0,2}?"
+
+
+@lru_cache(maxsize=None)
+def _term_re(term: str) -> re.Pattern[str]:
+    body = _GAP.join(re.escape(w) for w in term.split())
     if _is_latin(term):
-        pattern = r"(?<![\w'])" + re.escape(term) + r"(?![\w'])"
-        return [m.span() for m in re.finditer(pattern, clause)]
-    spans, start = [], 0
-    while (i := clause.find(term, start)) != -1:
-        spans.append((i, i + len(term)))
-        start = i + 1
-    return spans
+        return re.compile(r"(?<![\w'])" + body + r"(?![\w'])")
+    # Indic words take suffixes and particles, so match without word boundaries.
+    return re.compile(body)
 
 
-def _negated(clause: str, span: tuple[int, int]) -> bool:
+def _find(term: str, clause: str) -> list[tuple[int, int]]:
+    return [m.span() for m in _term_re(term).finditer(clause)]
+
+
+def _negated(clause: str, span: tuple[int, int], term: str) -> bool:
     tokens = [(m.start(), m.end(), m.group()) for m in re.finditer(r"\S+", clause)]
     inside = [i for i, (s, e, _) in enumerate(tokens) if s < span[1] and e > span[0]]
     if not inside:
         return False
     lo, hi = inside[0], inside[-1]
-    for i in range(max(0, lo - NEGATION_WINDOW_TOKENS), min(len(tokens), hi + NEGATION_WINDOW_TOKENS + 1)):
-        if lo <= i <= hi:
+    term_words = term.split()
+    for i in range(max(0, lo - NEGATION_WINDOW_TOKENS), min(len(tokens), hi + NEGATION_WINDOW_AFTER + 1)):
+        # Words of the phrase itself don't count ("सांस नहीं" is the red flag), but filler inside the gap does.
+        if lo <= i <= hi and any(w in tokens[i][2] for w in term_words):
             continue
         if _is_negation(tokens[i][2]):
             return True
@@ -104,7 +116,7 @@ def scan_utterance(text: str) -> list[Hit]:
             for terms in flag.terms.values():
                 for term in terms:
                     for span in _find(term.lower(), clause):
-                        if _negated(clause, span):
+                        if _negated(clause, span, term.lower()):
                             if flag.level < Urgency.EMERGENCY:
                                 continue
                             hit = Hit(

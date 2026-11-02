@@ -50,6 +50,7 @@ RED_FLAGS: tuple[RedFlag, ...] = (
         latn=["can't breathe", "cannot breathe", "cant breathe", "not able to breathe", "unable to breathe",
               "difficulty breathing", "trouble breathing", "short of breath", "shortness of breath",
               "breathless", "saans nahi", "saans nahin", "saans lene mein takleef", "saans lene me takleef",
+              "saans lene mein dikkat", "saans lene me dikkat", "saans lene mein taklif", "sans lene mein dikkat",
               "saans phool", "dum ghut"],
         hi=["सांस नहीं", "साँस नहीं", "सांस लेने में तकलीफ", "साँस लेने में तकलीफ", "सांस लेने में दिक्कत",
             "साँस लेने में दिक्कत", "सांस फूल", "साँस फूल", "दम घुट"],
@@ -278,4 +279,6 @@ NEGATIONS: dict[str, tuple[str, ...]] = {
 CLAUSE_BREAKS: tuple[str, ...] = (
     "but", "however", "although", "lekin", "magar", "par", "पर", "लेकिन", "मगर", "কিন্তু", "પણ", "પરંતુ",
     "ಆದರೆ", "പക്ഷേ", "പക്ഷെ", "पण", "ਪਰ", "ஆனால்", "ஆனா", "కానీ", "కాని",
+    # "and" also separates symptoms ("fever hai aur khansi nahi"). Splitting here can only add a flag, never drop one.
+    "and", "aur", "और", "आणि",
 )

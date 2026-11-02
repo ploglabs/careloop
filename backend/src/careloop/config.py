@@ -28,10 +28,13 @@ class Settings:
     stt_model: str = os.getenv("CARELOOP_STT_MODEL", "prisma-v2.5")
     tts_model: str = os.getenv("CARELOOP_TTS_MODEL", "timbre-v2.5")
 
-    # Dialogue LLM: any OpenAI-compatible chat completions endpoint (Groq by default)
-    llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY")
-    llm_base_url: str = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
-    llm_model: str = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    # Dialogue LLM: any OpenAI-compatible chat completions endpoint (DeepInfra by default)
+    llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("DEEPINFRA_API_KEY")
+    llm_base_url: str = os.getenv("LLM_BASE_URL", "https://api.deepinfra.com/v1/openai")
+    llm_model: str = os.getenv("LLM_MODEL", "google/gemma-4-26B-A4B-it")
+    # Hybrid models think before answering unless told not to; a phone call can't wait for that.
+    # Empty sends nothing, for providers that reject the field.
+    llm_reasoning_effort: str = os.getenv("LLM_REASONING_EFFORT", "none")
     # End-of-call second opinion on urgency. It can only raise the level.
     llm_review_enabled: bool = _bool("CARELOOP_LLM_REVIEW", True)
 
@@ -50,6 +53,10 @@ class Settings:
     cors_origins: list[str] = field(
         default_factory=lambda: os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
     )
+
+    @property
+    def llm_extra_body(self) -> dict:
+        return {"reasoning_effort": self.llm_reasoning_effort} if self.llm_reasoning_effort else {}
 
     @property
     def llm_enabled(self) -> bool:

@@ -1,8 +1,34 @@
-# CareLoop
+<p align="center">
+  <img src="web/src/app/icon.png" alt="CareLoop logo" width="96" height="96">
+</p>
+
+<h1 align="center">CareLoop</h1>
+
+<p align="center">
+  <strong>Multilingual post-discharge follow-up calls for Indian clinics and hospitals.</strong><br>
+  Built on Gnani Prisma (speech-to-text) and Gnani Timbre (text-to-speech).
+</p>
+
+<p align="center">
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#languages">Languages</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#running-it">Running it</a> ·
+  <a href="#privacy-and-compliance-dpdp-act-2023">Privacy</a> ·
+  <a href="#built-vs-roadmap">Built vs roadmap</a>
+</p>
+
+<p align="center">
+  <img alt="10 Indian languages" src="https://img.shields.io/badge/languages-10_Indian-0a0a0a">
+  <img alt="Gnani Prisma and Timbre" src="https://img.shields.io/badge/speech-Gnani_Prisma_%2B_Timbre-0a0a0a">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-0a0a0a">
+  <img alt="Next.js 16" src="https://img.shields.io/badge/next.js-16-0a0a0a">
+  <img alt="Synthetic data only" src="https://img.shields.io/badge/data-synthetic_only-0a0a0a">
+</p>
 
 A post-discharge care layer for clinics and hospital chains. A multilingual voice agent calls patients after they leave, runs a condition-specific check-in, triages what it hears in real time, books follow-up visits during the call, and hands the care team a structured report.
 
-Built for the Gnani AI Great Indian AI Internship Challenge, on **Gnani Prisma** (speech-to-text) and **Gnani Timbre** (text-to-speech).
+Built for the Gnani AI Great Indian AI Internship Challenge.
 
 > All data in this repository and its demos is synthetic. No real patients, phone numbers, IDs or recordings are used.
 
@@ -47,7 +73,7 @@ Built for the Gnani AI Great Indian AI Internship Challenge, on **Gnani Prisma**
 | Text-to-speech | **Timbre v2.5**, one voice per language (Poorvi for Hinglish) | Realtime WebSocket `GnaniTTSService`, with barge-in |
 | Evaluation | Prisma REST and Timbre REST through the `gnani-vachana` SDK | `backend/eval/run_eval.py` |
 
-Dialogue runs on an OpenAI-compatible tool-calling LLM (Groq `llama-3.3-70b-versatile` by default). Evon is not available on the API, so it is not used.
+Dialogue runs on an OpenAI-compatible tool-calling LLM: DeepInfra `google/gemma-4-26B-A4B-it` by default, chosen after comparing DeepInfra models for latency, tool-call accuracy and Hindi output on the real call prompt. Evon is not available on the API, so it is not used.
 
 ## Languages
 
@@ -57,10 +83,29 @@ The safety lines and red-flag lexicon are written for all 10. A language counts 
 
 | Language | Safety lines | Lexicon tests | Voice round trip | Native review |
 |---|---|---|---|---|
-| English | ✅ | ✅ | run eval | pending |
-| Hindi / Hinglish | ✅ | ✅ | run eval | pending |
-| Tamil, Kannada | ✅ | ✅ | run eval | pending |
-| Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi | ✅ | ✅ (basic) | run eval | pending |
+| English | ✅ | ✅ | ✅ | pending |
+| Hindi / Hinglish | ✅ | ✅ | ✅ | pending |
+| Tamil, Kannada | ✅ | ✅ | ✅ | pending |
+| Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi | ✅ | ✅ (basic) | ✅ | pending |
+
+### Speech round trip (Timbre v2.5 → Prisma v2.5)
+
+Each scripted line is synthesised by Timbre and transcribed back by Prisma (`eval/run_eval.py languages`). CER is the character error rate against the script.
+
+| Language | Consent line CER | Emergency line CER | Timbre TTS | Prisma STT |
+|---|---|---|---|---|
+| English (en-IN) | 0.036 | 0.0 | ok | ok |
+| Hindi (hi-IN) | 0.183 | 0.0 | ok | ok |
+| Bengali (bn-IN) | 0.176 | 0.035 | ok | ok |
+| Gujarati (gu-IN) | 0.175 | 0.0 | ok | ok |
+| Kannada (kn-IN) | 0.154 | 0.0 | ok | ok |
+| Malayalam (ml-IN) | 0.17 | 0.039 | ok | ok |
+| Marathi (mr-IN) | 0.175 | 0.055 | ok | ok |
+| Punjabi (pa-IN) | 0.185 | 0.025 | ok | ok |
+| Tamil (ta-IN) | 0.152 | 0.0 | ok | ok |
+| Telugu (te-IN) | 0.2 | 0.025 | ok | ok |
+
+The emergency line, the one that must be understood, comes back almost word for word in every language. Most of the consent line's error is the clinic, doctor and patient names: the script writes them in English ("Dr. Rao") and Prisma correctly writes them in the native script ("डॉक्टर राव"), which counts as a mismatch.
 
 ## Architecture
 
@@ -84,7 +129,7 @@ The safety lines and red-flag lexicon are written for all 10. A language counts 
 | `backend/src/careloop/packs/` | Condition packs (YAML) |
 | `backend/src/careloop/languages.py` | Language list, voices, scripted safety lines |
 | `backend/eval/` | Labelled triage cases and the speech/noise evaluation |
-| `web/` | Dashboard and patient call page |
+| `web/` | Clinic dashboard (charts drawn with [Dither Kit](https://tripwire.sh/dither-kit)) and patient call page |
 
 ## Running it
 
@@ -98,6 +143,10 @@ uv sync
 uv run careloop seed        # synthetic clinics, patients, slots, and past check-ins
 uv run careloop serve       # http://localhost:8000
 
+# Optional, keeps existing data
+uv run careloop queue --count 8     # more follow-ups due soon (3 min apart)
+uv run careloop alerts --count 6    # more patients whose check-ins raised red flags
+
 # Dashboard
 cd web
 cp .env.example .env.local
@@ -110,7 +159,7 @@ On the **Today** board, press **Call now** on any follow-up. The patient's phone
 Without an LLM key, text calls use the offline keyword brain (English only). Use it for development and as a fallback; the multilingual experience needs the LLM.
 
 ```bash
-uv run pytest                                   # 75 tests: triage cases, call flows, booking races, API
+uv run pytest                                   # 80 tests: triage cases, call flows, booking races, API
 uv run careloop simulate 3 yes 2 better no ...  # scripted synthetic call from the terminal
 uv run python eval/run_eval.py languages        # per-language Timbre → Prisma round trip
 uv run python eval/run_eval.py noise            # triage at 16 kHz, 8 kHz phone, 8 kHz + noise (SNR 10/5 dB)

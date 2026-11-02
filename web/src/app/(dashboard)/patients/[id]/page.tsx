@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AreaChart } from "@/components/dither-kit/area-chart";
+import { Area } from "@/components/dither-kit/area";
+import { Grid } from "@/components/dither-kit/grid";
+import { Tooltip } from "@/components/dither-kit/tooltip";
+import { XAxis } from "@/components/dither-kit/x-axis";
+import { YAxis } from "@/components/dither-kit/y-axis";
 import { api, useApi } from "@/lib/api";
 import { fmtDate, fmtDateTime, humanize } from "@/lib/format";
 import type { Call, PatientBrief, Plan, Report, Risk } from "@/lib/types";
 import { useLive } from "@/components/Shell";
-import { Button, Card, cx, Empty, ErrorNote, LevelBadge, PageHeader, Pill, RiskBadge } from "@/components/ui";
+import { Card, ConfirmButton, cx, Empty, ErrorNote, LevelBadge, PageHeader, Pill, RiskBadge } from "@/components/ui";
 
 type Detail = {
   patient: PatientBrief;
@@ -30,7 +35,6 @@ export default function PatientPage() {
   const trend = [...data.reports].reverse().filter((r) => r.recovery_score != null).map((r) => ({ date: fmtDate(r.created_at), score: r.recovery_score }));
 
   const withdraw = async () => {
-    if (!confirm("Record consent withdrawal and stop all follow-up calls for this patient?")) return;
     await api(`/api/patients/${p.id}/consent/withdraw`, { method: "POST" });
     reload();
   };
@@ -40,7 +44,7 @@ export default function PatientPage() {
       <PageHeader
         title={p.name}
         subtitle={<span>{p.age ?? "?"} {p.sex ?? ""} · {p.language_name}{p.codemix ? " (code-mixed)" : ""} · {p.phone}</span>}
-        actions={<><RiskBadge band={data.risk.band} score={data.risk.score} /><Button size="sm" onClick={withdraw}>Withdraw consent</Button></>}
+        actions={<><RiskBadge band={data.risk.band} score={data.risk.score} /><ConfirmButton onConfirm={withdraw} confirmLabel="Stop all calls? Click to confirm">Withdraw consent</ConfirmButton></>}
       />
       {data.risk.factors.length > 0 && (
         <p className="-mt-3 mb-5 text-xs text-faint">Heuristic risk factors: {data.risk.factors.join(", ")}</p>
@@ -52,7 +56,7 @@ export default function PatientPage() {
             <ul className="divide-y divide-border">
               {data.reports.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/reports/${r.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-surface-2">
+                  <Link href={`/reports/${r.id}`} className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2">
                     <LevelBadge level={r.urgency} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{r.pack_name} <span className="font-normal text-faint">· {fmtDateTime(r.created_at)}</span></div>
@@ -66,15 +70,14 @@ export default function PatientPage() {
           </Card>
           {trend.length > 1 && (
             <Card title="Recovery score">
-              <div className="h-48 px-2 py-3">
-                <ResponsiveContainer>
-                  <LineChart data={trend}>
-                    <XAxis dataKey="date" fontSize={11} stroke="var(--faint)" />
-                    <YAxis domain={[0, 100]} fontSize={11} stroke="var(--faint)" width={30} />
-                    <Tooltip contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }} />
-                    <Line dataKey="score" stroke="var(--accent)" strokeWidth={2} dot />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="h-48 px-4 pb-3 pt-4">
+                <AreaChart data={trend} config={{ score: { label: "Score", color: "ink" } }} margins={{ left: 28, bottom: 22 }}>
+                  <Grid />
+                  <YAxis tickCount={4} tickFormatter={(v) => String(Math.round(v))} />
+                  <XAxis dataKey="date" maxTicks={6} />
+                  <Area dataKey="score" variant="gradient" />
+                  <Tooltip labelKey="date" />
+                </AreaChart>
               </div>
             </Card>
           )}

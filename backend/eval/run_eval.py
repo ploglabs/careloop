@@ -97,14 +97,26 @@ def stt(wav: bytes, language: str) -> tuple[str, float]:
     from gnani.stt.client import GnaniSTTClient
 
     client = GnaniSTTClient(settings.gnani_api_key)
-    start = time.perf_counter()
-    result = client.transcribe_bytes(wav, language_code=language, format="transcribe")
-    return (result.get("transcript") or "").strip(), (time.perf_counter() - start) * 1000
+    for attempt in range(3):
+        start = time.perf_counter()
+        try:
+            result = client.transcribe_bytes(wav, language_code=language, format="transcribe")
+            return (result.get("transcript") or "").strip(), (time.perf_counter() - start) * 1000
+        except Exception as e:  # Prisma REST sometimes returns a gateway 504; retry before giving up.
+            if attempt == 2 or "50" not in str(e)[:12]:
+                raise
+            time.sleep(2 * (attempt + 1))
+    raise RuntimeError("unreachable")
 
 
-def cer(ref: str, hyp: str) -> float:
-    a = "".join(c for c in unicodedata.normalize("NFC", ref.lower()) if c.isalnum())
-    b = "".join(c for c in unicodedata.normalize("NFC", hyp.lower()) if c.isalnum())
+def cer(ref: str, hyp: str, native_only: bool = False) -> float:
+    """Character error rate. native_only drops Latin letters, so an English name in an Indic
+    line ("Asha", "Dr. Rao") that Prisma correctly writes in native script isn't counted as an error."""
+    def keep(c: str) -> bool:
+        return c.isalnum() and not (native_only and c.isascii() and c.isalpha())
+
+    a = "".join(c for c in unicodedata.normalize("NFC", ref.lower()) if keep(c))
+    b = "".join(c for c in unicodedata.normalize("NFC", hyp.lower()) if keep(c))
     if not a:
         return 0.0
     prev = list(range(len(b) + 1))
@@ -123,11 +135,17 @@ def cmd_languages() -> list[dict]:
             text = LINES[code][key].format(name="Asha", clinic="Demo Clinic", doctor="Dr. Rao")
             try:
                 pcm = tts(text, code)
-                hyp, ms = stt(to_wav(pcm, RATE), code)
-                rows.append({"language": code, "line": key, "tts_ok": True, "cer": round(cer(text, hyp), 3),
-                             "stt_ms": round(ms), "hypothesis": hyp})
             except Exception as e:  # keep going; record the failure in the matrix
-                rows.append({"language": code, "line": key, "tts_ok": False, "error": str(e)[:200]})
+                rows.append({"language": code, "line": key, "tts_ok": False, "stt_ok": False, "error": f"TTS: {str(e)[:200]}"})
+                print(rows[-1], file=sys.stderr)
+                continue
+            try:
+                hyp, ms = stt(to_wav(pcm, RATE), code)
+                rows.append({"language": code, "line": key, "tts_ok": True, "stt_ok": True,
+                             "cer": round(cer(text, hyp, native_only=code != "en-IN"), 3),
+                             "stt_ms": round(ms), "hypothesis": hyp})
+            except Exception as e:
+                rows.append({"language": code, "line": key, "tts_ok": True, "stt_ok": False, "error": f"STT: {str(e)[:200]}"})
             print(rows[-1], file=sys.stderr)
     return rows
 
@@ -177,12 +195,14 @@ def summarise_noise(rows: list[dict]) -> str:
 
 
 def summarise_languages(rows: list[dict]) -> str:
-    lines = ["| Language | Consent line CER | Emergency line CER | TTS |", "|---|---|---|---|"]
+    lines = ["| Language | Consent line CER | Emergency line CER | Timbre TTS | Prisma STT |", "|---|---|---|---|---|"]
     for code, lang in LANGUAGES.items():
         rs = {r["line"]: r for r in rows if r["language"] == code}
         c, e = rs.get("consent", {}), rs.get("emergency", {})
-        ok = c.get("tts_ok") and e.get("tts_ok")
-        lines.append(f"| {lang.english_name} ({code}) | {c.get('cer', '—')} | {e.get('cer', '—')} | {'ok' if ok else 'failed'} |")
+        tts_ok = c.get("tts_ok") and e.get("tts_ok")
+        stt_ok = c.get("stt_ok") and e.get("stt_ok")
+        lines.append(f"| {lang.english_name} ({code}) | {c.get('cer', '—')} | {e.get('cer', '—')} | "
+                     f"{'ok' if tts_ok else 'failed'} | {'ok' if stt_ok else 'failed'} |")
     return "\n".join(lines)
 
 

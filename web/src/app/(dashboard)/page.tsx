@@ -56,7 +56,7 @@ export default function TodayPage() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <Card title="Alert queue" action={<Link href="/flagged" className="text-xs text-accent hover:underline">All flagged patients →</Link>}>
+          <Card title="Alert queue" action={<Link href="/flagged" className="text-xs text-muted hover:text-text">All flagged patients →</Link>}>
             {data && data.alerts.length === 0 && <Empty>No open alerts. Nice.</Empty>}
             <ul className="divide-y divide-border">
               {data?.alerts.map((a) => <AlertRow key={a.id} alert={a} onChange={reload} />)}
@@ -68,7 +68,7 @@ export default function TodayPage() {
             <ul className="divide-y divide-border">
               {data?.recent_reports.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/reports/${r.id}`} className="flex gap-3 px-4 py-3 hover:bg-surface-2">
+                  <Link href={`/reports/${r.id}`} className="flex gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2">
                     <span className={cx("mt-1 h-2 w-2 shrink-0 rounded-full", LEVEL_BAR[r.urgency])} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -156,14 +156,16 @@ function AlertRow({ alert: a, onChange }: { alert: Alert; onChange: () => void }
 
 function PlanRow({ plan: p, onChange }: { plan: Plan; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
   const callNow = async () => {
     setBusy(true);
+    setCallError(null);
     try {
       const res = await api<{ token: string }>(`/api/plans/${p.id}/ring`, { method: "POST" });
       window.open(`/call/${res.token}`, "_blank", "noopener");
       onChange();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      setCallError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -185,13 +187,14 @@ function PlanRow({ plan: p, onChange }: { plan: Plan; onChange: () => void }) {
         {p.attempts > 0 && <span>· attempt {p.attempts}</span>}
       </div>
       <div className="mt-2 flex gap-1.5">
-        <Button size="sm" onClick={callNow} disabled={busy}>
-          <PhoneCall size={13} /> Call now
+        <Button size="sm" onClick={callNow} disabled={busy || p.status === "in_progress"}>
+          <PhoneCall size={13} /> {p.status === "in_progress" ? "On a call" : "Call now"}
         </Button>
-        <a href={`/call/${p.token}`} target="_blank" rel="noopener" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-muted hover:bg-surface-2">
+        <a href={`/call/${p.token}`} target="_blank" rel="noopener" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-muted transition-colors duration-150 hover:bg-surface-2">
           <PhoneForwarded size={13} /> Patient link
         </a>
       </div>
+      {callError && <p className="animate-in mt-2 text-xs text-emergency">{callError}</p>}
     </li>
   );
 }
