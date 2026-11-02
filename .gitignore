@@ -10,7 +10,7 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
-eval/out/
+**/eval/out/
 
 # Node
 node_modules/
