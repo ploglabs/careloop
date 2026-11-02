@@ -27,6 +27,8 @@ class Settings:
     gnani_api_key: str | None = os.getenv("GNANI_API_KEY")
     stt_model: str = os.getenv("CARELOOP_STT_MODEL", "prisma-v2.5")
     tts_model: str = os.getenv("CARELOOP_TTS_MODEL", "timbre-v2.5")
+    # Agent voice: "female", "male", or "match" (same gender as the patient's record, female if unknown).
+    agent_voice: str = os.getenv("CARELOOP_AGENT_VOICE", "female").strip().lower()
 
     # Dialogue LLM: any OpenAI-compatible chat completions endpoint (DeepInfra by default)
     llm_api_key: str | None = os.getenv("LLM_API_KEY") or os.getenv("DEEPINFRA_API_KEY")

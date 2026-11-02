@@ -42,6 +42,7 @@ def find_slots(
     doctor_id: int | None = None,
     specialty: str | None = None,
     after: datetime | None = None,
+    before: datetime | None = None,
     limit: int = 3,
 ) -> list[tuple[Slot, Doctor]]:
     after = after or utcnow()
@@ -52,6 +53,8 @@ def find_slots(
         .order_by(col(Slot.start))
         .limit(limit)
     )
+    if before is not None:
+        q = q.where(Slot.start < before)
     if doctor_id is not None:
         q = q.where(Slot.doctor_id == doctor_id)
     if specialty:
@@ -138,4 +141,7 @@ def active_appointments(db: Session, patient_id: int) -> list[tuple[Appointment,
 
 
 def describe_slot(slot: Slot, doctor: Doctor) -> str:
-    return f"{to_ist(slot.start):%A %d %B, %I:%M %p} with {doctor.name}"
+    start = to_ist(slot.start)
+    days_ahead = (start.date() - to_ist(utcnow()).date()).days
+    relative = {0: "today, ", 1: "tomorrow, ", 2: "day after tomorrow, "}.get(days_ahead, "")
+    return f"{relative}{start:%A %d %B, %I:%M %p} with {doctor.name}"

@@ -13,28 +13,33 @@ class Lang:
     code: str
     english_name: str
     native_name: str
-    # Timbre v2.5 voice for this language (from gnani.tts.client.TIMBRE_V25_VOICES).
-    voice: str
+    # Timbre v2.5 voices for this language (from gnani.tts.client.TIMBRE_V25_VOICES), by gender as
+    # listed in Gnani's voice catalog. Tamil and Telugu have no male v2.5 voice.
+    voice: str  # female
+    voice_male: str | None = None
 
 
 LANGUAGES: dict[str, Lang] = {
     l.code: l
     for l in [
-        Lang("en-IN", "English", "English", "Pranav"),
-        Lang("hi-IN", "Hindi", "हिन्दी", "Nalini"),
-        Lang("bn-IN", "Bengali", "বাংলা", "Kirra"),
-        Lang("gu-IN", "Gujarati", "ગુજરાતી", "Falak"),
-        Lang("kn-IN", "Kannada", "ಕನ್ನಡ", "Saanvi"),
-        Lang("ml-IN", "Malayalam", "മലയാളം", "Reshma"),
-        Lang("mr-IN", "Marathi", "मराठी", "Zahira"),
-        Lang("pa-IN", "Punjabi", "ਪੰਜਾਬੀ", "Mehuli"),
+        Lang("en-IN", "English", "English", "Kaveri", "Pranav"),
+        Lang("hi-IN", "Hindi", "हिन्दी", "Nalini", "Deepak"),
+        Lang("bn-IN", "Bengali", "বাংলা", "Kirra", "Dhruva"),
+        Lang("gu-IN", "Gujarati", "ગુજરાતી", "Falak", "Veera"),
+        Lang("kn-IN", "Kannada", "ಕನ್ನಡ", "Saanvi", "Kavin"),
+        Lang("ml-IN", "Malayalam", "മലയാളം", "Reshma", "Riyaan"),
+        Lang("mr-IN", "Marathi", "मराठी", "Zahira", "Ishaan"),
+        Lang("pa-IN", "Punjabi", "ਪੰਜਾਬੀ", "Mehuli", "Zayan"),
         Lang("ta-IN", "Tamil", "தமிழ்", "Asmita"),
         Lang("te-IN", "Telugu", "తెలుగు", "Suhana"),
     ]
 }
 
-# Timbre's Hinglish voice, used for code-mixed Hindi callers.
+# Timbre's Hinglish voice (female), used for code-mixed Hindi callers.
 HINGLISH_VOICE = "Poorvi"
+
+# Timbre v3.0 voices speak all 10 languages.
+V3_VOICES = {"female": "Shivani", "male": "Avinash"}
 
 LINE_KEYS = ("consent", "consent_declined", "emergency", "urgent", "closing", "callback", "no_advice")
 
@@ -240,12 +245,40 @@ def lang(code: str) -> Lang:
     return LANGUAGES.get(code, LANGUAGES["en-IN"])
 
 
-def line(code: str, key: str, **fmt: str) -> str:
+# Variants for female patients where the scripted line addresses the patient with gendered verb forms.
+LINES_FEMALE: dict[str, dict[str, str]] = {
+    "hi-IN": {
+        "emergency": (
+            "आप जो बता रही हैं उसमें तुरंत डॉक्टरी मदद की ज़रूरत हो सकती है। कृपया अभी नज़दीकी इमरजेंसी "
+            "में जाएँ या 108 पर कॉल करें। आपकी केयर टीम को अभी सूचना भेजी जा रही है।"
+        ),
+    },
+}
+
+
+def line(code: str, key: str, patient_gender: str | None = None, **fmt: str) -> str:
     text = LINES.get(code, LINES["en-IN"])[key]
+    if patient_gender == "female":
+        text = LINES_FEMALE.get(code, {}).get(key, text)
     return text.format(**fmt) if fmt else text
 
 
-def voice_for(code: str, codemix: bool = False) -> str:
+def pick_voice(code: str, codemix: bool = False, gender: str = "female", model: str = "timbre-v2.5") -> tuple[str, str]:
+    """The Timbre voice for a language and preferred gender, and the gender actually used.
+
+    Falls back to the female voice when the language has no male one, so callers must use the
+    returned gender (not the requested one) for anything that depends on how the agent sounds.
+    """
+    gender = "male" if gender == "male" else "female"
+    if model == "timbre-v3.0":
+        return V3_VOICES[gender], gender
+    l = lang(code)
+    if gender == "male" and l.voice_male:
+        return l.voice_male, "male"
     if codemix and code == "hi-IN":
-        return HINGLISH_VOICE
-    return lang(code).voice
+        return HINGLISH_VOICE, "female"
+    return l.voice, "female"
+
+
+def voice_for(code: str, codemix: bool = False, gender: str = "female", model: str = "timbre-v2.5") -> str:
+    return pick_voice(code, codemix, gender, model)[0]

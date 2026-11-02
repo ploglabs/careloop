@@ -18,7 +18,6 @@ from careloop.agent.prompts import system_prompt
 from careloop.agent.session import CallSession
 from careloop.agent.tools import TOOL_SPECS, pipecat_tools
 from careloop.config import settings
-from careloop.languages import line, voice_for
 
 
 def _stt_settings(s: CallSession):
@@ -43,7 +42,7 @@ def _tts_settings(s: CallSession, language: str | None = None):
     language = language or s.language
     return GnaniTTSService.Settings(
         model=settings.tts_model,
-        voice=voice_for(language, s.codemix),
+        voice=s.voice,
         language=language,
         # Slightly slower for older patients.
         speed=0.92 if (s.patient.age or 0) >= 60 else 1.0,
@@ -182,7 +181,7 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
     def on_language_change(code: str) -> None:
         from pipecat_gnani import GnaniSTTSettings, GnaniTTSSettings
 
-        frames = [TTSUpdateSettingsFrame(delta=GnaniTTSSettings(language=code, voice=voice_for(code, s.codemix)))]
+        frames = [TTSUpdateSettingsFrame(delta=GnaniTTSSettings(language=code, voice=s.voice))]
         if not s.codemix:
             frames.append(STTUpdateSettingsFrame(delta=GnaniSTTSettings(language=code)))
         asyncio.get_running_loop().create_task(worker.queue_frames(frames))
@@ -194,7 +193,7 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
         if not s.ended:
             logger.info(f"call {call_id}: max length reached")
             s.ended, s.end_reason = True, "max_length"
-            await end_call(line(s.language, "closing"))
+            await end_call(s.line("closing"))
 
     timer: asyncio.Task | None = None
 
