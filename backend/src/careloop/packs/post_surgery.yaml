@@ -1,0 +1,84 @@
+id: post_surgery
+name: Post-surgery check-in (day 1 and day 7)
+specialty: general_surgery
+procedure_types: [appendectomy, hernia_repair, cholecystectomy, knee_arthroscopy, minor_surgery]
+offset_days: [1, 7]
+context: >
+  The patient recently had surgery and was discharged. Check pain, fever, the wound,
+  mobility and medicines.
+questions:
+  - key: pain_score
+    type: scale
+    min: 0
+    max: 10
+    ask: On a scale of 0 to 10, how much pain do you have right now?
+    score: {invert: true}
+  - key: pain_trend
+    type: enum
+    options: [better, same, worse]
+    ask: Is the pain getting better, staying the same, or getting worse?
+    score: {better: 1.0, same: 0.5, worse: 0.0}
+  - key: fever
+    type: bool
+    ask: Have you had any fever or chills?
+    score: {bad_when: true}
+  - key: wound_appearance
+    type: enum
+    options: [clean_dry, red, swollen, discharge, bleeding, opened]
+    ask: How does the wound look? Clean and dry, red, swollen, any discharge, bleeding, or has it opened?
+    score: {clean_dry: 1.0, red: 0.5, swollen: 0.4, discharge: 0.2, bleeding: 0.0, opened: 0.0}
+  - key: mobility
+    type: enum
+    options: [normal, limited, bedbound]
+    ask: Are you able to walk around normally, a little, or are you mostly in bed?
+    score: {normal: 1.0, limited: 0.6, bedbound: 0.1}
+  - key: nausea_vomiting
+    type: bool
+    ask: Any nausea or vomiting?
+    score: {bad_when: true}
+  - key: med_adherence
+    type: enum
+    options: [all, some, none]
+    ask: Are you taking all your prescribed medicines, some of them, or none?
+    medication: true
+    score: {all: 1.0, some: 0.5, none: 0.0}
+  - key: wants_appointment
+    type: bool
+    ask: Would you like to book a follow-up visit or dressing change?
+red_flags:
+  - id: surg_wound_bleeding
+    when: wound_appearance in ['bleeding', 'opened']
+    level: URGENT
+    reason: Wound bleeding or opened
+  - id: surg_infection_signs
+    when: fever and wound_appearance in ['red', 'swollen', 'discharge']
+    level: URGENT
+    reason: Fever with signs of wound infection
+  - id: surg_severe_pain
+    when: pain_score >= 8
+    level: URGENT
+    reason: Severe pain (8+/10)
+  - id: surg_pain_worsening
+    when: pain_score >= 5 and pain_trend == 'worse'
+    level: REVIEW
+    reason: Moderate pain that is getting worse
+  - id: surg_fever
+    when: fever
+    level: REVIEW
+    reason: Post-operative fever
+  - id: surg_discharge
+    when: wound_appearance == 'discharge'
+    level: REVIEW
+    reason: Wound discharge
+  - id: surg_vomiting
+    when: nausea_vomiting
+    level: REVIEW
+    reason: Nausea or vomiting after surgery
+  - id: surg_bedbound
+    when: mobility == 'bedbound'
+    level: REVIEW
+    reason: Mostly bedbound after surgery
+  - id: surg_no_meds
+    when: med_adherence == 'none'
+    level: REVIEW
+    reason: Not taking prescribed medicines

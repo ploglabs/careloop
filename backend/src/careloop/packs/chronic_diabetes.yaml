@@ -1,0 +1,62 @@
+id: chronic_diabetes
+name: Diabetes, monthly check-in
+specialty: endocrinology
+procedure_types: [diabetes_review, diabetes_new_diagnosis]
+offset_days: [30]
+context: >
+  The patient is managing type 2 diabetes. Check recent sugar readings, low-sugar episodes,
+  medicines, diet and foot care.
+questions:
+  - key: fasting_sugar
+    type: number
+    min: 20
+    max: 700
+    unit: mg/dL
+    ask: What was your most recent fasting sugar reading?
+  - key: hypo_episodes
+    type: bool
+    ask: Have you had any episodes of low sugar, like shaking, sweating or dizziness?
+    score: {bad_when: true}
+  - key: med_adherence
+    type: enum
+    options: [all, some, none]
+    ask: Are you taking all your diabetes medicines, some of them, or none?
+    medication: true
+    score: {all: 1.0, some: 0.5, none: 0.0}
+  - key: diet_adherence
+    type: enum
+    options: [good, partial, poor]
+    ask: How well have you been able to follow the diet plan? Good, partly, or not much?
+    score: {good: 1.0, partial: 0.5, poor: 0.1}
+  - key: foot_problems
+    type: bool
+    ask: Any cuts, sores, or numbness in your feet?
+    score: {bad_when: true}
+  - key: wants_appointment
+    type: bool
+    ask: Would you like to book a review with the doctor?
+red_flags:
+  - id: dm_very_high
+    when: fasting_sugar >= 300
+    level: URGENT
+    reason: Fasting sugar 300 mg/dL or higher
+  - id: dm_low
+    when: fasting_sugar < 70
+    level: URGENT
+    reason: Fasting sugar below 70 mg/dL
+  - id: dm_high
+    when: fasting_sugar >= 200
+    level: REVIEW
+    reason: Fasting sugar 200 mg/dL or higher
+  - id: dm_hypo
+    when: hypo_episodes
+    level: REVIEW
+    reason: Reported low-sugar episodes
+  - id: dm_foot
+    when: foot_problems
+    level: REVIEW
+    reason: Foot problems in a diabetic patient
+  - id: dm_no_meds
+    when: med_adherence == 'none'
+    level: REVIEW
+    reason: Not taking diabetes medicines
