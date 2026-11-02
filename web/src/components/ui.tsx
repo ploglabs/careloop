@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Level } from "@/lib/types";
 
 export function cx(...c: (string | false | null | undefined)[]) {
@@ -38,10 +40,10 @@ export function Pill({ children, className }: { children: ReactNode; className?:
 
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={cx("rounded-xl border border-border bg-surface", className)}>
+    <section className={cx("overflow-hidden rounded-xl border border-border bg-surface", className)}>
       {title && (
-        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">{title}</h2>
+        <header className="flex items-center justify-between gap-3 border-b border-border bg-surface-2/60 px-4 py-2.5">
+          <h2 className="text-[13px] font-medium">{title}</h2>
           {action}
         </header>
       )}
@@ -50,14 +52,17 @@ export function Card({ children, className, title, action }: { children: ReactNo
   );
 }
 
+/** A labelled number in a grey frame, the value on a white inner card. */
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: Level }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-3">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={cx("mt-1 text-2xl font-semibold tabular-nums", tone === "EMERGENCY" && "text-emergency", tone === "URGENT" && "text-urgent")}>
-        {value}
+    <div className="rounded-xl bg-surface-2 p-1">
+      <div className="truncate px-2 pb-1.5 pt-1 text-xs font-medium text-text/80">{label}</div>
+      <div className="rounded-lg border border-border bg-surface px-3 py-3 text-center shadow-[0_1px_1px_rgba(0,0,0,0.03)]">
+        <div className={cx("text-[26px] font-semibold leading-tight tracking-tight tabular-nums", tone === "EMERGENCY" && "text-emergency", tone === "URGENT" && "text-urgent")}>
+          {value}
+        </div>
+        <div className="mt-0.5 h-4 truncate text-xs text-faint">{hint}</div>
       </div>
-      {hint && <div className="mt-0.5 text-xs text-faint">{hint}</div>}
     </div>
   );
 }
@@ -69,10 +74,10 @@ export function Button({ variant = "ghost", size = "md", className, ...props }: 
     <button
       {...props}
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none",
+        "press inline-flex items-center justify-center gap-1.5 rounded-lg font-medium disabled:opacity-50 disabled:pointer-events-none",
         size === "sm" ? "h-7 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
-        variant === "primary" && "bg-accent text-white hover:opacity-90 dark:text-black",
-        variant === "ghost" && "border border-border bg-surface hover:bg-surface-2",
+        variant === "primary" && "bg-accent text-white hover:bg-accent/85",
+        variant === "ghost" && "border border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.03)] hover:bg-surface-2",
         variant === "danger" && "bg-emergency text-white hover:opacity-90",
         className,
       )}
@@ -120,5 +125,37 @@ export function RiskBadge({ band, score }: { band: "low" | "medium" | "high"; sc
     <span className={cx("text-xs font-medium", RISK_STYLE[band])} title="Heuristic readmission risk, not a validated model">
       {band} risk · {score}
     </span>
+  );
+}
+
+/** Destructive action in two clicks: the first arms it (and says what will happen), the second runs it. */
+export function ConfirmButton({ children, confirmLabel, onConfirm, size = "sm" }: {
+  children: ReactNode; confirmLabel: string; onConfirm: () => Promise<void> | void; size?: "sm" | "md";
+}) {
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <Button
+      size={size}
+      variant={armed ? "danger" : "ghost"}
+      disabled={busy}
+      onClick={async () => {
+        if (!armed) return setArmed(true);
+        setBusy(true);
+        try {
+          await onConfirm();
+        } finally {
+          setBusy(false);
+          setArmed(false);
+        }
+      }}
+    >
+      {armed ? confirmLabel : children}
+    </Button>
   );
 }

@@ -38,7 +38,7 @@ export default function PatientsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {rows.map((p) => (
-                <tr key={p.id} className="hover:bg-surface-2">
+                <tr key={p.id} className="transition-colors duration-150 hover:bg-surface-2">
                   <td className="px-4 py-2.5">
                     <Link href={`/patients/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
                     <div className="text-xs text-faint">{p.age ?? "?"} {p.sex ?? ""} · {p.phone}</div>
