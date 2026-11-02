@@ -106,8 +106,8 @@ def openai_tools() -> list[dict[str, Any]]:
 
 
 def pipecat_tools():
-    from pipecat.adapters.schemas.function_schema import FunctionSchema
-    from pipecat.adapters.schemas.tools_schema import ToolsSchema
+    from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
+    from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 
     return ToolsSchema(
         standard_tools=[
