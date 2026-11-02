@@ -50,3 +50,8 @@
 - {lang: gu-IN, text: "તાવ નથી", expect: ROUTINE}
 - {lang: pa-IN, text: "ਛਾਤੀ ਵਿੱਚ ਦਰਦ ਹੋ ਰਿਹਾ ਹੈ", expect: EMERGENCY}
 - {lang: pa-IN, text: "ਬੁਖਾਰ ਨਹੀਂ ਹੈ", expect: ROUTINE}
+- {lang: hi-IN, text: "मुझे सांस लेने में भी बहुत तकलीफ हो रही है", expect: EMERGENCY}
+- {lang: en-IN, text: "I have difficulty in breathing since morning", expect: EMERGENCY}
+- {lang: hi-IN, text: "Nahi, fever ya shivering jaisa kuch nahi hua", expect: ROUTINE}
+- {lang: hi-IN, text: "fever hai aur khansi nahi hai", expect: REVIEW}
+- {lang: hi-IN, text: "saans lene mein bahut dikkat ho rahi hai", expect: EMERGENCY}
