@@ -17,7 +17,12 @@ def template_summary(s: "CallSession") -> str:
     for q in s.pack.questions:
         status = s.answer_status.get(q.key)
         if status == "answered":
-            parts.append(f"{q.key.replace('_', ' ')}: {s.answers[q.key]}")
+            value = s.answers[q.key]
+            if isinstance(value, bool):
+                value = "yes" if value else "no"
+            elif isinstance(value, str):
+                value = value.replace("_", " ")
+            parts.append(f"{q.key.replace('_', ' ')}: {value}")
         elif status:
             parts.append(f"{q.key.replace('_', ' ')}: {status}")
     flags = sorted({h.reason for h in s.hits if h.level >= Urgency.REVIEW and not h.negated})

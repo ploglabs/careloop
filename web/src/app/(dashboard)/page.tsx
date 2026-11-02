@@ -113,7 +113,7 @@ function AlertRow({ alert: a, onChange }: { alert: Alert; onChange: () => void }
     }
   };
   return (
-    <li className="animate-in flex gap-3 px-4 py-3">
+    <li className="flex gap-3 px-4 py-3">
       <span className={cx("w-1 shrink-0 rounded-full", LEVEL_BAR[a.level])} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
