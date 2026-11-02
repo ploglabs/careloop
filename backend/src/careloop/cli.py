@@ -9,6 +9,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     seed = sub.add_parser("seed", help="Reset the database with synthetic demo data")
     seed.add_argument("--no-history", action="store_true", help="Skip simulated past check-ins")
+    queue = sub.add_parser("queue", help="Add synthetic patients with follow-ups due soon (keeps existing data)")
+    queue.add_argument("--count", type=int, default=8)
+    queue.add_argument("--spacing", type=int, default=3, help="Minutes between due times")
+    alerts = sub.add_parser("alerts", help="Add synthetic patients whose check-ins raised red-flag alerts")
+    alerts.add_argument("--count", type=int, default=6)
     serve = sub.add_parser("serve", help="Run the API server")
     serve.add_argument("--host", default="0.0.0.0")
     serve.add_argument("--port", type=int, default=8000)
@@ -24,6 +29,16 @@ def main() -> None:
 
         build(history=not args.no_history)
         print("Seeded synthetic demo data.")
+    elif args.cmd == "queue":
+        from careloop.seed import add_queue
+
+        added = add_queue(args.count, args.spacing)
+        print(f"Queued {len(added)} follow-ups:\n  " + "\n  ".join(added))
+    elif args.cmd == "alerts":
+        from careloop.seed import add_alerts
+
+        added = add_alerts(args.count)
+        print(f"Ran {len(added)} red-flag check-ins:\n  " + "\n  ".join(added))
     elif args.cmd == "serve":
         import uvicorn
 
