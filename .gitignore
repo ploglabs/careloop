@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Local data and secrets
+.env
+*.db
+*.db-shm
+*.db-wal
+eval/out/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local agent tooling
+.agents/
+.claude/
+skills-lock.json
