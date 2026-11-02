@@ -1,0 +1,69 @@
+id: derma_week1
+name: Dermatology, 1-week check-in
+specialty: dermatology
+procedure_types: [derma_consult, derma_procedure, acne_treatment, eczema_treatment]
+offset_days: [7]
+context: >
+  The patient was seen in dermatology and asked to report back after a week on how the
+  skin condition and prescribed treatment are going.
+questions:
+  - key: redness_trend
+    type: enum
+    options: [better, same, worse]
+    ask: Compared with the visit, is the redness better, the same, or worse?
+    score: {better: 1.0, same: 0.5, worse: 0.0}
+  - key: itching_score
+    type: scale
+    min: 0
+    max: 10
+    ask: On a scale of 0 to 10, how bad is the itching?
+    score: {invert: true}
+  - key: swelling
+    type: bool
+    ask: Is there any swelling in the area?
+    score: {bad_when: true}
+  - key: rash_spreading
+    type: bool
+    ask: Has the rash spread to new areas?
+    score: {bad_when: true}
+  - key: fever
+    type: bool
+    ask: Have you had any fever since the visit?
+    score: {bad_when: true}
+  - key: med_adherence
+    type: enum
+    options: [all, some, none]
+    ask: Are you applying or taking all the prescribed medicines, some of them, or none?
+    medication: true
+    score: {all: 1.0, some: 0.5, none: 0.0}
+  - key: side_effects
+    type: text
+    ask: Any side effects such as burning, dryness, or peeling from the medicines?
+  - key: wants_appointment
+    type: bool
+    ask: Would you like to book a follow-up visit with the doctor?
+red_flags:
+  - id: derma_fever_swelling
+    when: swelling and fever
+    level: URGENT
+    reason: Swelling with fever can indicate a skin infection
+  - id: derma_spreading_fever
+    when: rash_spreading and fever
+    level: URGENT
+    reason: Spreading rash with fever
+  - id: derma_severe_itch
+    when: itching_score >= 8
+    level: REVIEW
+    reason: Severe itching (8+/10)
+  - id: derma_worsening
+    when: redness_trend == 'worse'
+    level: REVIEW
+    reason: Condition worse than at the visit
+  - id: derma_spreading
+    when: rash_spreading
+    level: REVIEW
+    reason: Rash spreading to new areas
+  - id: derma_no_meds
+    when: med_adherence == 'none'
+    level: REVIEW
+    reason: Not using prescribed treatment
