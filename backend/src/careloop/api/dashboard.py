@@ -7,7 +7,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from careloop import analytics, events
 from careloop.api import serializers as ser
-from careloop.api.deps import User, audit, current_user
+from careloop.api.deps import STAFF_ROLES, User, audit, current_user
 from careloop.config import settings
 from careloop.db import get_session
 from careloop.languages import LANGUAGES
@@ -197,7 +197,11 @@ def schedule(days: int = 7, doctor_id: int | None = None, db: Session = Depends(
 
 
 @router.get("/events")
-async def stream():
+async def stream(role: str = ""):
+    # EventSource cannot send headers, so the demo role comes as a query parameter.
+    if role not in STAFF_ROLES:
+        raise HTTPException(403, "Live events are restricted to care-team roles")
+
     async def gen():
         yield {"event": "hello", "data": "{}"}
         async for event, data in events.subscribe():
