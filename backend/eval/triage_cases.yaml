@@ -1,0 +1,52 @@
+# Labelled utterances for the triage lexicon.
+# expect: the exact level scan_utterance must return (ROUTINE means no hit).
+# Synthetic sentences only. Add native-speaker cases before marking a language supported.
+- {lang: en-IN, text: "I have chest pain since morning", expect: EMERGENCY}
+- {lang: en-IN, text: "I can't breathe properly when I lie down", expect: EMERGENCY}
+- {lang: en-IN, text: "the wound is bleeding a lot and won't stop", expect: EMERGENCY}
+- {lang: en-IN, text: "my lips are swollen after the cream", expect: EMERGENCY}
+- {lang: en-IN, text: "I fainted in the bathroom yesterday", expect: EMERGENCY}
+- {lang: en-IN, text: "No fever, the redness is better", expect: ROUTINE}
+- {lang: en-IN, text: "I don't have any fever", expect: ROUTINE}
+- {lang: en-IN, text: "no fever but there is chest pain", expect: EMERGENCY}
+- {lang: en-IN, text: "I don't have chest pain", expect: REVIEW}
+- {lang: en-IN, text: "there is some pus coming from the stitches", expect: URGENT}
+- {lang: en-IN, text: "I had a high fever last night", expect: URGENT}
+- {lang: en-IN, text: "slight fever yesterday", expect: REVIEW}
+- {lang: en-IN, text: "itching is less now, I am fine", expect: ROUTINE}
+- {lang: en-IN, text: "the benefits of the cream are good", expect: ROUTINE}
+- {lang: en-IN, text: "the pain is unbearable", expect: URGENT}
+- {lang: en-IN, text: "my stitches opened when I coughed", expect: URGENT}
+- {lang: hi-IN, text: "सुबह से सीने में दर्द हो रहा है", expect: EMERGENCY}
+- {lang: hi-IN, text: "सांस नहीं आ रही ठीक से", expect: EMERGENCY}
+- {lang: hi-IN, text: "बुखार नहीं है, लाली कम हुई है", expect: ROUTINE}
+- {lang: hi-IN, text: "कल रात तेज़ बुखार था", expect: URGENT}
+- {lang: hi-IN, text: "घाव से मवाद निकल रहा है", expect: URGENT}
+- {lang: hi-IN, text: "थोड़ा बुखार था", expect: REVIEW}
+- {lang: hi-IN, text: "सब ठीक है, दवाई ले रहा हूँ", expect: ROUTINE}
+- {lang: hi-IN, text: "क्रीम लगाने के बाद होंठ सूज गए", expect: EMERGENCY}
+- {lang: hi-IN, text: "Bukhar nahi hai but seene mein dard hai", expect: EMERGENCY}
+- {lang: hi-IN, text: "kal tez bukhar tha aur ulti bhi hui", expect: URGENT}
+- {lang: hi-IN, text: "sab theek hai, itching kam hai", expect: ROUTINE}
+- {lang: ta-IN, text: "நேற்று இரவு நெஞ்சு வலி இருந்தது", expect: EMERGENCY}
+- {lang: ta-IN, text: "காய்ச்சல் இல்லை, நன்றாக இருக்கிறேன்", expect: ROUTINE}
+- {lang: ta-IN, text: "காயத்தில் சீழ் வருகிறது", expect: URGENT}
+- {lang: ta-IN, text: "மூச்சு விட முடியல", expect: EMERGENCY}
+- {lang: ta-IN, text: "கொஞ்சம் காய்ச்சல் இருக்கு", expect: REVIEW}
+- {lang: kn-IN, text: "ನಿನ್ನೆಯಿಂದ ಎದೆ ನೋವು ಇದೆ", expect: EMERGENCY}
+- {lang: kn-IN, text: "ಜ್ವರ ಇಲ್ಲ, ಚೆನ್ನಾಗಿದ್ದೇನೆ", expect: ROUTINE}
+- {lang: kn-IN, text: "ಜ್ವರ ಬಂದಿಲ್ಲ", expect: ROUTINE}
+- {lang: kn-IN, text: "ಸ್ವಲ್ಪ ಜ್ವರ ಇದೆ", expect: REVIEW}
+- {lang: te-IN, text: "ఛాతీ నొప్పి వస్తోంది", expect: EMERGENCY}
+- {lang: te-IN, text: "జ్వరం లేదు", expect: ROUTINE}
+- {lang: te-IN, text: "గాయం నుండి చీము వస్తోంది", expect: URGENT}
+- {lang: ml-IN, text: "നെഞ്ചുവേദന ഉണ്ട്", expect: EMERGENCY}
+- {lang: ml-IN, text: "പനി ഇല്ല", expect: ROUTINE}
+- {lang: mr-IN, text: "छातीत दुखत आहे", expect: EMERGENCY}
+- {lang: mr-IN, text: "ताप नाही", expect: ROUTINE}
+- {lang: bn-IN, text: "বুকে ব্যথা হচ্ছে", expect: EMERGENCY}
+- {lang: bn-IN, text: "জ্বর নেই", expect: ROUTINE}
+- {lang: gu-IN, text: "છાતીમાં દુખાવો થાય છે", expect: EMERGENCY}
+- {lang: gu-IN, text: "તાવ નથી", expect: ROUTINE}
+- {lang: pa-IN, text: "ਛਾਤੀ ਵਿੱਚ ਦਰਦ ਹੋ ਰਿਹਾ ਹੈ", expect: EMERGENCY}
+- {lang: pa-IN, text: "ਬੁਖਾਰ ਨਹੀਂ ਹੈ", expect: ROUTINE}
