@@ -96,7 +96,9 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
     llm = OpenAILLMService(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
-        settings=OpenAILLMService.Settings(model=settings.llm_model, temperature=0.3),
+        settings=OpenAILLMService.Settings(
+            model=settings.llm_model, temperature=0.3, extra={"extra_body": settings.llm_extra_body},
+        ),
     )
 
     opening = s.start(mode="voice")
@@ -219,6 +221,6 @@ def voice_ready() -> tuple[bool, str]:
     if not settings.gnani_api_key:
         return False, "GNANI_API_KEY is not set"
     if not settings.llm_api_key:
-        return False, "LLM_API_KEY (or GROQ_API_KEY) is not set"
+        return False, "LLM_API_KEY (or DEEPINFRA_API_KEY) is not set"
     os.environ.setdefault("GNANI_API_KEY", settings.gnani_api_key)
     return True, "ok"

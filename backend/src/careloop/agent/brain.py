@@ -41,6 +41,7 @@ class LLMBrain:
         for _ in range(MAX_TOOL_ROUNDS):
             resp = await self.client.chat.completions.create(
                 model=settings.llm_model, messages=self.messages, tools=openai_tools(), temperature=0.3,
+                extra_body=settings.llm_extra_body,
             )
             msg = resp.choices[0].message
             if msg.content and msg.content.strip():
@@ -95,6 +96,7 @@ Be conservative: if anything suggests a dangerous symptom, choose the higher lev
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0,
+        extra_body=settings.llm_extra_body,
     )
     data = json.loads(resp.choices[0].message.content or "{}")
     if data.get("level", "ROUTINE").upper() not in Urgency.__members__:

@@ -47,7 +47,7 @@ Built for the Gnani AI Great Indian AI Internship Challenge, on **Gnani Prisma**
 | Text-to-speech | **Timbre v2.5**, one voice per language (Poorvi for Hinglish) | Realtime WebSocket `GnaniTTSService`, with barge-in |
 | Evaluation | Prisma REST and Timbre REST through the `gnani-vachana` SDK | `backend/eval/run_eval.py` |
 
-Dialogue runs on an OpenAI-compatible tool-calling LLM (Groq `llama-3.3-70b-versatile` by default). Evon is not available on the API, so it is not used.
+Dialogue runs on an OpenAI-compatible tool-calling LLM: DeepInfra `deepseek-ai/DeepSeek-V4-Flash` by default, with reasoning off so replies come back fast. Evon is not available on the API, so it is not used.
 
 ## Languages
 
