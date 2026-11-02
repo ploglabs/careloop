@@ -47,7 +47,7 @@ Built for the Gnani AI Great Indian AI Internship Challenge, on **Gnani Prisma**
 | Text-to-speech | **Timbre v2.5**, one voice per language (Poorvi for Hinglish) | Realtime WebSocket `GnaniTTSService`, with barge-in |
 | Evaluation | Prisma REST and Timbre REST through the `gnani-vachana` SDK | `backend/eval/run_eval.py` |
 
-Dialogue runs on an OpenAI-compatible tool-calling LLM: DeepInfra `deepseek-ai/DeepSeek-V4-Flash` by default, with reasoning off so replies come back fast. Evon is not available on the API, so it is not used.
+Dialogue runs on an OpenAI-compatible tool-calling LLM: DeepInfra `google/gemma-4-26B-A4B-it` by default, chosen after comparing DeepInfra models for latency, tool-call accuracy and Hindi output on the real call prompt. Evon is not available on the API, so it is not used.
 
 ## Languages
 
@@ -57,10 +57,29 @@ The safety lines and red-flag lexicon are written for all 10. A language counts 
 
 | Language | Safety lines | Lexicon tests | Voice round trip | Native review |
 |---|---|---|---|---|
-| English | ✅ | ✅ | run eval | pending |
-| Hindi / Hinglish | ✅ | ✅ | run eval | pending |
-| Tamil, Kannada | ✅ | ✅ | run eval | pending |
-| Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi | ✅ | ✅ (basic) | run eval | pending |
+| English | ✅ | ✅ | ✅ | pending |
+| Hindi / Hinglish | ✅ | ✅ | ✅ | pending |
+| Tamil, Kannada | ✅ | ✅ | ✅ | pending |
+| Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi | ✅ | ✅ (basic) | ✅ | pending |
+
+### Speech round trip (Timbre v2.5 → Prisma v2.5)
+
+Each scripted line is synthesised by Timbre and transcribed back by Prisma (`eval/run_eval.py languages`). CER is the character error rate against the script.
+
+| Language | Consent line CER | Emergency line CER | Timbre TTS | Prisma STT |
+|---|---|---|---|---|
+| English (en-IN) | 0.036 | 0.0 | ok | ok |
+| Hindi (hi-IN) | 0.183 | 0.0 | ok | ok |
+| Bengali (bn-IN) | 0.176 | 0.035 | ok | ok |
+| Gujarati (gu-IN) | 0.175 | 0.0 | ok | ok |
+| Kannada (kn-IN) | 0.154 | 0.0 | ok | ok |
+| Malayalam (ml-IN) | 0.17 | 0.039 | ok | ok |
+| Marathi (mr-IN) | 0.175 | 0.055 | ok | ok |
+| Punjabi (pa-IN) | 0.185 | 0.025 | ok | ok |
+| Tamil (ta-IN) | 0.152 | 0.0 | ok | ok |
+| Telugu (te-IN) | 0.2 | 0.025 | ok | ok |
+
+The emergency line, the one that must be understood, comes back almost word for word in every language. Most of the consent line's error is the clinic, doctor and patient names: the script writes them in English ("Dr. Rao") and Prisma correctly writes them in the native script ("डॉक्टर राव"), which counts as a mismatch.
 
 ## Architecture
 
