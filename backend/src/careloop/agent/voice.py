@@ -13,7 +13,7 @@ from typing import Any
 
 from loguru import logger
 
-from careloop.agent.brain import review_call
+from careloop.agent.brain import asks_patient, review_call
 from careloop.agent.prompts import system_prompt
 from careloop.agent.session import CallSession
 from careloop.agent.tools import TOOL_SPECS, pipecat_tools
@@ -167,6 +167,9 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
             if name == "end_call" and result.get("ok"):
                 run_llm = False
                 await end_call(result.get("closing_line"))
+            elif s.transcript and s.transcript[-1]["role"] == "assistant" and asks_patient(s.transcript[-1]["text"]):
+                # The bot just asked the patient something; wait for the answer before speaking again.
+                run_llm = False
             await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=run_llm))
 
         return handler
