@@ -13,7 +13,7 @@
   <a href="#what-it-does">What it does</a> ·
   <a href="#languages">Languages</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="#running-it">Running it</a> ·
+  <a href="#running-it-locally">Run it locally</a> ·
   <a href="#privacy-and-compliance-dpdp-act-2023">Privacy</a> ·
   <a href="#built-vs-roadmap">Built vs roadmap</a>
 </p>
@@ -131,39 +131,134 @@ The emergency line, the one that must be understood, comes back almost word for 
 | `backend/eval/` | Labelled triage cases and the speech/noise evaluation |
 | `web/` | Clinic dashboard (charts drawn with [Dither Kit](https://tripwire.sh/dither-kit)) and patient call page |
 
-## Running it
+## Running it locally
 
-Requirements: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node 20+ with pnpm.
+Everything below runs on your own machine against synthetic data. Text calls work with no API keys at all; voice calls need a Gnani key and an LLM key.
+
+### Prerequisites
+
+| Tool | Version | Install |
+|---|---|---|
+| Python | 3.12+ | managed for you by uv |
+| [uv](https://docs.astral.sh/uv/) | latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Node.js | 20+ | [nodejs.org](https://nodejs.org) |
+| pnpm | 11 (pinned in `web/package.json`) | `corepack enable pnpm` |
+| Browser | Chrome or Edge recommended | needed for microphone access on voice calls |
+
+### 1. Clone
 
 ```bash
-# Backend
+git clone https://github.com/ploglabs/careloop.git
+cd careloop
+```
+
+### 2. Start the backend (API, call agent, scheduler)
+
+```bash
 cd backend
-cp .env.example .env        # add GNANI_API_KEY and LLM_API_KEY for voice; text mode works without
+cp .env.example .env
 uv sync
-uv run careloop seed        # synthetic clinics, patients, slots, and past check-ins
-uv run careloop serve       # http://localhost:8000
-
-# Optional, keeps existing data
-uv run careloop queue --count 8     # more follow-ups due soon (3 min apart)
-uv run careloop alerts --count 6    # more patients whose check-ins raised red flags
-
-# Dashboard
-cd web
-cp .env.example .env.local
-pnpm install
-pnpm dev                    # http://localhost:3000
+uv run careloop seed      # resets careloop.db with synthetic clinics, patients, slots and past check-ins
+uv run careloop serve     # API on http://localhost:8000
 ```
 
-On the **Today** board, press **Call now** on any follow-up. The patient's phone page opens; answer by voice (needs keys) or by text.
+`careloop seed` takes a few seconds: it runs real scripted check-ins through the agent so the dashboard starts with reports and alerts. Re-run it any time to reset the database.
 
-Without an LLM key, text calls use the offline keyword brain (English only). Use it for development and as a fallback; the multilingual experience needs the LLM.
+**API keys** go in `backend/.env`. What you get depends on which ones you set:
+
+| Keys set | Text calls | Voice calls | End-of-call LLM summary | Languages |
+|---|---|---|---|---|
+| None | ✅ offline keyword agent | ❌ (Answer button is disabled) | ❌ | English only |
+| `LLM_API_KEY` | ✅ LLM agent | ❌ | ✅ | all 10 |
+| `LLM_API_KEY` + `GNANI_API_KEY` | ✅ | ✅ Prisma STT + Timbre TTS | ✅ | all 10 |
+
+- `GNANI_API_KEY`: from [app.gnani.ai/voice](https://app.gnani.ai/voice).
+- `LLM_API_KEY`: any OpenAI-compatible endpoint with tool calling. DeepInfra is the default ([get a key](https://deepinfra.com/dash/api_keys)); to use another provider, change `LLM_BASE_URL` and `LLM_MODEL` too.
+
+Restart `careloop serve` after editing `.env`.
+
+### 3. Start the dashboard
+
+In a second terminal:
 
 ```bash
-uv run pytest                                   # 80 tests: triage cases, call flows, booking races, API
-uv run careloop simulate 3 yes 2 better no ...  # scripted synthetic call from the terminal
-uv run python eval/run_eval.py languages        # per-language Timbre → Prisma round trip
-uv run python eval/run_eval.py noise            # triage at 16 kHz, 8 kHz phone, 8 kHz + noise (SNR 10/5 dB)
+cd web
+cp .env.example .env.local    # NEXT_PUBLIC_API_URL=http://localhost:8000
+pnpm install
+pnpm dev                      # http://localhost:3000
 ```
+
+Open [http://localhost:3000](http://localhost:3000). You should see the **Today** board with a follow-up queue on the right and an alert queue in the middle. A green **Live** dot in the top bar means the dashboard is receiving real-time events from the API.
+
+### 4. Walk through it
+
+**A text check-in (no keys needed)**
+1. In the **Follow-up queue**, press **Call now** on any patient. Their phone page opens in a new tab and shows an incoming call.
+2. Press **Text**. The agent asks for consent, then runs the check-in for that patient's condition.
+3. Without an LLM key, reply in short English answers. For a dermatology patient, for example: `yes`, `better`, `2`, `no`, `no`, `no`, `all`, `no`, `no`.
+4. When the call ends, go back to the dashboard: the report appears under **Latest reports**, and the patient's page shows the transcript, answers and score.
+
+**A voice check-in (both keys)**
+1. Press **Call now**, pick a language on the phone page, then press **Answer** and allow the microphone.
+2. Speak naturally in that language. Use headphones so the agent doesn't hear itself through your speakers.
+3. The status line shows **Speaking**, **Listening** or **Your turn**, and the transcript fills in as you talk. The agent hangs up by itself when the check-in is done.
+
+**See triage escalate in real time**
+- During a call, say something like `I have chest pain and I can't breathe properly` (post-surgery patient), or answer yes to both swelling and fever (dermatology patient).
+- The agent speaks a scripted safety line straight away, and an alert toast pops up on the dashboard with a beep. The alert sits at the top of the **Alert queue** with the patient's own words and the rule that fired. **Acknowledge** or **Assign** it from there.
+
+**Book a follow-up visit**
+- When asked if you'd like to see the doctor, say yes and pick one of the offered slots. The booking shows under **Schedule** when you pick that patient's doctor.
+
+**Other things to try**
+- **Signed in as** (bottom of the sidebar) switches between nurse, doctor and admin views.
+- **Patient link** on a queue item opens the same phone page a patient would get by WhatsApp or SMS after missed calls. The messages themselves land in **Messages**, since nothing is ever actually sent.
+- If you leave a queue item alone, the scheduler rings it automatically when it's due, retries after a missed call, and falls back to the link.
+
+### 5. Add more test data
+
+These keep everything that's already in the database:
+
+```bash
+cd backend
+uv run careloop queue --count 8 --spacing 3   # follow-ups due soon, 3 minutes apart
+uv run careloop alerts --count 6              # patients whose check-ins raised red flags (real alerts and reports)
+```
+
+### 6. Run the automated tests
+
+```bash
+cd backend
+uv run pytest                                    # 80 tests: triage cases, call flows, booking races, API
+uv run careloop simulate 3 yes 2 better no ...   # one scripted call for plan 3, printed to the terminal
+uv run careloop simulate 3 yes ... --llm         # the same with the LLM agent (needs LLM_API_KEY)
+
+# Speech evaluation (needs GNANI_API_KEY, makes real API calls)
+uv run python eval/run_eval.py languages         # per-language Timbre → Prisma round trip
+uv run python eval/run_eval.py noise             # triage at 16 kHz, 8 kHz phone, 8 kHz + noise (SNR 10/5 dB)
+```
+
+```bash
+cd web
+pnpm lint
+pnpm exec tsc --noEmit
+```
+
+The labelled triage cases live in `backend/eval/triage_cases.yaml`; add a case there and `pytest` checks it.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Dashboard says "Couldn't reach the CareLoop API" | Start the backend with `uv run careloop serve`, and check `NEXT_PUBLIC_API_URL` in `web/.env.local`. |
+| **Answer** is greyed out on the phone page | Voice needs both `GNANI_API_KEY` and `LLM_API_KEY` in `backend/.env`. Restart the backend after adding them. |
+| "This follow-up is already done" | That plan is finished. Use **Call now** on another patient, or add more with `careloop queue`. |
+| No sound, or the microphone isn't picked up | Allow microphone access for `localhost:3000` in the browser's site settings, and check the right input device is selected. |
+| The agent interrupts itself or hears its own voice | Use headphones. |
+| Browser errors mention a CORS policy | Set `CORS_ORIGINS` in `backend/.env` to the dashboard's origin (default `http://localhost:3000`). |
+| Port 8000 or 3000 is already in use | `uv run careloop serve --port 8001` (then update `NEXT_PUBLIC_API_URL`), or `pnpm dev --port 3001` (then update `PUBLIC_WEB_URL` and `CORS_ORIGINS`). |
+| Dashboard doesn't pick up code changes | Stop `pnpm dev`, delete `web/.next`, and start it again. |
+| You want a clean slate | `uv run careloop seed` resets the database. |
 
 ## Privacy and compliance (DPDP Act 2023)
 
