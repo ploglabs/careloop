@@ -17,12 +17,16 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def utcnow() -> datetime:
-    """All stored datetimes are naive UTC."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    """All stored datetimes are timezone-aware UTC (SQLModel enforces this)."""
+    return datetime.now(timezone.utc)
+
+
+def as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
 def to_ist(dt: datetime) -> datetime:
-    return dt.replace(tzinfo=timezone.utc).astimezone(IST)
+    return as_utc(dt).astimezone(IST)
 
 
 class Urgency(IntEnum):
