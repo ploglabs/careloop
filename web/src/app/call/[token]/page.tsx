@@ -151,10 +151,10 @@ function Incoming({ info, language, setLanguage, onAnswer, onDecline }: {
       </label>
 
       <div className="mt-auto grid w-full grid-cols-3 pb-6 pt-10">
-        <CallAction label="Decline" onClick={onDecline} className="bg-emergency text-white">
+        <CallAction label="Decline" onClick={onDecline} className="btn btn-red">
           <PhoneOff size={24} />
         </CallAction>
-        <CallAction label="Text" onClick={() => onAnswer("text")} className="border border-border bg-surface-2 text-text">
+        <CallAction label="Text" onClick={() => onAnswer("text")} className="btn-light">
           <Keyboard size={24} />
         </CallAction>
         <CallAction
@@ -162,7 +162,7 @@ function Incoming({ info, language, setLanguage, onAnswer, onDecline }: {
           onClick={() => onAnswer("voice")}
           disabled={!info.voice_enabled}
           title={info.voice_enabled ? undefined : "Voice needs GNANI_API_KEY and LLM_API_KEY on the server"}
-          className="bg-accent text-white"
+          className="btn"
         >
           <Phone size={24} />
         </CallAction>
@@ -296,7 +296,7 @@ function TextCall({ token, info, language, lines, add, phase, setPhase }: CallPr
               className="h-12 flex-1 rounded-2xl border border-border bg-surface px-4 text-[15px] outline-none transition-[border-color] duration-150 focus:border-accent"
               autoFocus
             />
-            <button disabled={!text.trim()} className="press grid h-12 w-12 place-items-center rounded-2xl bg-accent text-white disabled:opacity-40" aria-label="Send">
+            <button disabled={!text.trim()} className="btn grid h-12 w-12 place-items-center rounded-2xl disabled:opacity-40" aria-label="Send">
               <Send size={18} />
             </button>
           </form>
@@ -425,11 +425,11 @@ function VoiceCall({ token, info, language, lines, add, phase, setPhase }: CallP
               client.current?.enableMic(muted);
               setMuted(!muted);
             }}
-            className={muted ? "bg-text text-surface" : "border border-border bg-surface-2 text-text"}
+            className={muted ? "bg-text text-surface" : "btn-light"}
           >
             {muted ? <MicOff size={22} /> : <Mic size={22} />}
           </CallAction>
-          <CallAction label="End" onClick={() => client.current?.disconnect()} className="bg-emergency text-white">
+          <CallAction label="End" onClick={() => client.current?.disconnect()} className="btn btn-red">
             <PhoneOff size={22} />
           </CallAction>
         </div>

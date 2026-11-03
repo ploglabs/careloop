@@ -74,11 +74,11 @@ export function Button({ variant = "ghost", size = "md", className, ...props }: 
     <button
       {...props}
       className={cx(
-        "press inline-flex items-center justify-center gap-1.5 rounded-lg font-medium disabled:opacity-50 disabled:pointer-events-none",
+        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium disabled:pointer-events-none",
         size === "sm" ? "h-7 px-2.5 text-xs" : "h-9 px-3.5 text-sm",
-        variant === "primary" && "bg-accent text-white hover:bg-accent/85",
-        variant === "ghost" && "border border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.03)] hover:bg-surface-2",
-        variant === "danger" && "bg-emergency text-white hover:opacity-90",
+        variant === "primary" && "btn",
+        variant === "ghost" && "btn-light",
+        variant === "danger" && "btn btn-red",
         className,
       )}
     />
