@@ -59,6 +59,7 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
         LLMFullResponseStartFrame,
         LLMMessagesAppendFrame,
         LLMTextFrame,
+        STTMuteFrame,
         STTUpdateSettingsFrame,
         TranscriptionFrame,
         TTSSpeakFrame,
@@ -77,6 +78,11 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
     from pipecat.services.openai.llm import OpenAILLMService
     from pipecat.transports.base_transport import TransportParams
     from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+    from pipecat.turns.user_mute import (
+        AlwaysUserMuteStrategy,
+        FunctionCallUserMuteStrategy,
+        MuteUntilFirstBotCompleteUserMuteStrategy,
+    )
     from pipecat.workers.runner import WorkerRunner
     from pipecat_gnani import GnaniSTTService
 
@@ -110,7 +116,27 @@ async def run_voice_call(call_id: int, webrtc_connection) -> None:
         ],
         tools=pipecat_tools(),
     )
-    aggregators = LLMContextAggregatorPair(context, user_params=LLMUserAggregatorParams(vad_analyzer=vad))
+    # The patient's mic hears the bot (speakerphone, weak echo cancellation), and STT turns that echo
+    # into "patient" turns the LLM then answers: the bot ran through questions on its own. So the
+    # patient is muted until the consent line is done, while the bot speaks, and during tool calls.
+    aggregators = LLMContextAggregatorPair(context, user_params=LLMUserAggregatorParams(
+        vad_analyzer=vad,
+        user_mute_strategies=[
+            MuteUntilFirstBotCompleteUserMuteStrategy(),
+            AlwaysUserMuteStrategy(),
+            FunctionCallUserMuteStrategy(),
+        ],
+    ))
+
+    # The aggregator mute only drops frames after STT and TriageTap, and transcripts of echo can arrive
+    # after the bot stops. Mute STT itself so echo audio is never transcribed, triaged or stored.
+    @aggregators.user().event_handler("on_user_mute_started")
+    async def _on_mute(aggregator):
+        await aggregator.push_frame(STTMuteFrame(mute=True), FrameDirection.UPSTREAM)
+
+    @aggregators.user().event_handler("on_user_mute_stopped")
+    async def _on_unmute(aggregator):
+        await aggregator.push_frame(STTMuteFrame(mute=False), FrameDirection.UPSTREAM)
 
     class TriageTap(FrameProcessor):
         async def process_frame(self, frame: Frame, direction: FrameDirection):
