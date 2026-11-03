@@ -37,7 +37,15 @@ TOOL_SPECS: dict[str, tuple[str, dict[str, Any], list[str]]] = {
     "check_slots": (
         "Find up to 3 free appointment slots, with the same doctor by default.",
         {
-            "preferred_date": {"type": "string", "description": "YYYY-MM-DD, optional"},
+            "preferred_date": {
+                "type": "string",
+                "description": (
+                    "Optional. The day the patient asked for, in English words as they said it, e.g. 'tomorrow', "
+                    "'day after tomorrow', 'next Friday', 'in 3 days', '5 November' (translate kal, parso, etc.). "
+                    "The system works out the exact date. A YYYY-MM-DD date from the CALENDAR also works. "
+                    "Omit for the earliest slots."
+                ),
+            },
             "specialty": {"type": "string", "description": "Only when routing to a different department"},
         },
         [],

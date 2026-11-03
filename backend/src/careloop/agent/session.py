@@ -7,18 +7,17 @@ brain). Tool handlers take plain JSON arguments and return JSON-able dicts for t
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import timedelta
 from typing import Any
 
 from loguru import logger
 from sqlmodel import col, select
 
-from careloop import booking, events
+from careloop import booking, dates, events
 from careloop.config import settings
 from careloop.db import session_scope
-from careloop.languages import LANGUAGES, lang, line
+from careloop.languages import LANGUAGES, lang, line, pick_voice
 from careloop.models import (
-    IST,
     Answer,
     Call,
     CallStatus,
@@ -70,6 +69,7 @@ class CallSession:
         self.pack: Pack = get_pack(plan.pack_id)
         self.language = call.language or patient.language
         self.codemix = patient.codemix
+        self.voice, self.agent_gender = self._pick_voice(self.language)
 
         self.consent: bool | None = None
         self.answers: dict[str, Any] = {}
@@ -94,6 +94,22 @@ class CallSession:
         # Hooks set by the transport.
         self.on_language_change: Callable[[str], None] | None = None
 
+    @property
+    def patient_gender(self) -> str | None:
+        sex = (self.patient.sex or "").strip().upper()[:1]
+        return {"F": "female", "M": "male"}.get(sex)
+
+    def line(self, key: str, **fmt: str) -> str:
+        """A scripted line in the call language, worded for the patient's gender where that matters."""
+        return line(self.language, key, patient_gender=self.patient_gender, **fmt)
+
+    def _pick_voice(self, language: str) -> tuple[str, str]:
+        """(Timbre voice, its gender) for this call: CARELOOP_AGENT_VOICE, or the patient's gender for "match"."""
+        preferred = settings.agent_voice
+        if preferred == "match":
+            preferred = self.patient_gender or "female"
+        return pick_voice(language, self.codemix, preferred, settings.tts_model)
+
     # ---------------------------------------------------------------- lifecycle
 
     def start(self, mode: str) -> str:
@@ -116,7 +132,7 @@ class CallSession:
 
     def opening_line(self) -> str:
         first_name = self.patient.name.split()[0]
-        return line(self.language, "consent", name=first_name, clinic=self.clinic.name, doctor=self.doctor.name)
+        return self.line("consent", name=first_name, clinic=self.clinic.name, doctor=self.doctor.name)
 
     @property
     def elapsed_seconds(self) -> float:
@@ -145,7 +161,7 @@ class CallSession:
             if hit.level >= Urgency.URGENT and hit.level > self._spoken_level:
                 self._spoken_level = hit.level
                 key = "emergency" if hit.level == Urgency.EMERGENCY else "urgent"
-                safe_line = line(self.language, key)
+                safe_line = self.line(key)
                 result.speak_now.append(safe_line)
                 self.add_assistant_text(safe_line)
                 next_step = (
@@ -246,7 +262,7 @@ class CallSession:
             top = fired[0]
             if top.level >= Urgency.URGENT and top.level > self._spoken_level:
                 self._spoken_level = top.level
-                result["say_exactly"] = line(self.language, "urgent")
+                result["say_exactly"] = self.line("urgent")
                 result["safety"] = (
                     f"Red flag '{top.reason}' ({top.level.name}). The care team has been alerted and the urgent "
                     "safety message is spoken to the patient automatically; do not repeat it. "
@@ -258,7 +274,7 @@ class CallSession:
             result["follow_up"] = "Ask which medicine is being missed and why, then call record_medication for each."
         if self.unclear_streak >= 2:
             result["follow_up"] = (
-                f"Two unclear answers in a row. Say: \"{line(self.language, 'callback')}\" "
+                f"Two unclear answers in a row. Say: \"{self.line('callback')}\" "
                 "then call end_call with reason 'callback'."
             )
         remaining = self.unanswered
@@ -280,34 +296,57 @@ class CallSession:
             key = "emergency" if lvl == Urgency.EMERGENCY else "urgent"
             return {
                 "ok": True,
-                "say_exactly": line(self.language, key),
+                "say_exactly": self.line(key),
                 "note": "This safety message is spoken to the patient automatically; do not repeat it.",
             }
         return {"ok": True, "note": "Flagged for doctor review."}
 
     def tool_check_slots(self, preferred_date: str | None = None, specialty: str | None = None) -> dict[str, Any]:
-        after = utcnow()
-        if preferred_date:
-            try:
-                # Interpret the date as IST midnight.
-                day = datetime.fromisoformat(preferred_date).replace(tzinfo=IST)
-                after = max(after, day.astimezone(timezone.utc))
-            except ValueError:
-                pass
-        with session_scope() as db:
-            if specialty and specialty != self.doctor.specialty:
-                rows = booking.find_slots(db, clinic_id=self.clinic.id, specialty=specialty, after=after)
-            else:
-                rows = booking.find_slots(db, clinic_id=self.clinic.id, doctor_id=self.doctor.id, after=after)
+        now = utcnow()
+        day = dates.resolve_day(preferred_date)
+        today = dates.today_ist()
+        date_note = None
+        if preferred_date and day is None:
+            date_note = f"Could not work out a date from {preferred_date!r}; these are the earliest slots."
+        elif day is not None and day < today:
+            date_note = f"{day:%A %d %B %Y} is in the past; these are the earliest slots."
+            day = None
+
+        def search(after, before=None):
+            with session_scope() as db:
+                if specialty and specialty != self.doctor.specialty:
+                    return booking.find_slots(db, clinic_id=self.clinic.id, specialty=specialty, after=after, before=before)
+                rows = booking.find_slots(db, clinic_id=self.clinic.id, doctor_id=self.doctor.id, after=after, before=before)
                 if not rows:
-                    rows = booking.find_slots(db, clinic_id=self.clinic.id, specialty=self.doctor.specialty, after=after)
+                    rows = booking.find_slots(db, clinic_id=self.clinic.id, specialty=self.doctor.specialty,
+                                              after=after, before=before)
+                return rows
+
+        if day is not None:
+            start = max(now, dates.ist_midnight_utc(day))
+            rows = search(start, dates.ist_midnight_utc(day + timedelta(days=1)))
+            label = dates.relative_label(day, today)
+            requested = f"{day:%A %d %B %Y}" + (f" ({label})" if label else "")
+            if rows:
+                date_note = f"Slots on the requested day, {requested}. Use this date; it is already worked out."
+            else:
+                rows = search(start) or search(now)
+                date_note = f"No free slots on {requested}. These are the nearest available ones; say so to the patient."
+        else:
+            rows = search(now)
         if not rows:
             return {"ok": True, "slots": [], "note": "No free slots. Tell the patient the clinic will call to arrange a visit."}
-        return {
+        result: dict[str, Any] = {
             "ok": True,
             "slots": [{"slot_id": s.id, "when": booking.describe_slot(s, d), "doctor": d.name} for s, d in rows],
-            "instruction": "Offer these in one short sentence. Read back the chosen one and get a yes before book_slot.",
+            "instruction": (
+                "Offer these in one short sentence, using the day and time exactly as given in 'when'. "
+                "Read back the chosen one and get a yes before book_slot with that option's slot_id."
+            ),
         }
+        if date_note:
+            result["date_note"] = date_note
+        return result
 
     def tool_book_slot(self, slot_id: int, reason: str = "follow-up") -> dict[str, Any]:
         with session_scope() as db:
@@ -393,9 +432,16 @@ class CallSession:
         if language not in LANGUAGES:
             return {"ok": False, "error": f"Unsupported language. Choose from {sorted(LANGUAGES)}"}
         self.language = language
+        previous_gender = self.agent_gender
+        self.voice, self.agent_gender = self._pick_voice(language)
         if self.on_language_change:
             self.on_language_change(language)
-        return {"ok": True, "instruction": f"From now on speak only {lang(language).english_name} ({lang(language).native_name})."}
+        instruction = f"From now on speak only {lang(language).english_name} ({lang(language).native_name})."
+        if self.agent_gender != previous_gender:
+            instruction += (
+                f" Your voice is now {self.agent_gender}: refer to yourself with {self.agent_gender} grammatical forms."
+            )
+        return {"ok": True, "instruction": instruction}
 
     def tool_end_call(self, reason: str = "completed") -> dict[str, Any]:
         # Refuse once so a skipped question gets asked; a second attempt always ends the call,
@@ -413,7 +459,7 @@ class CallSession:
             }
         self.ended = True
         self.end_reason = reason
-        closing = line(self.language, "consent_declined" if reason == "consent_declined" else "closing")
+        closing = self.line("consent_declined" if reason == "consent_declined" else "closing")
         if reason in ("emergency", "callback"):
             closing = ""
         if closing:

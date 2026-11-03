@@ -177,6 +177,10 @@ uv run careloop serve     # API on http://localhost:8000
 
 Restart `careloop serve` after editing `.env`.
 
+**Agent voice gender.** `CARELOOP_AGENT_VOICE` picks the Timbre voice: `female` (default), `male`, or `match` (same gender as the patient's record). Tamil and Telugu have no male Timbre v2.5 voice, so they stay female. The agent's own wording follows the voice it actually speaks with (Hindi "मैं समझ गई" vs "समझ गया", Punjabi "ਸਮਝ ਗਈ" vs "ਸਮਝ ਗਿਆ"), and it addresses the patient with forms that match their recorded gender.
+
+**Dates.** The agent gets today's date and a 14-day calendar. When a patient asks for "tomorrow", "day after tomorrow", "next Friday", "in 3 days", "5 November", or *kal* / *parso* in any of the 10 languages, `check_slots` works out the date itself (`careloop/dates.py`) and returns slots on that day, or the nearest ones if that day is full.
+
 ### 3. Start the dashboard
 
 In a second terminal:
