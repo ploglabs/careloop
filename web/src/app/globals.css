@@ -45,20 +45,25 @@
   --color-muted-foreground: var(--muted);
   --color-popover: var(--surface);
   --color-popover-foreground: var(--text);
-  --font-sans: var(--font-cal-sans);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-cal-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @layer base {
   /* Bare `border` utilities (vendored components) take the theme border, not currentColor. */
   *, ::before, ::after { border-color: var(--border); }
+  /* Cal Sans is display-only: one weight, so headings use it and body text stays in the lighter Geist. */
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+    font-synthesis-weight: none;
+  }
 }
 
 body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  font-synthesis-weight: none; /* Cal Sans ships one weight; never fake a bold */
   text-rendering: optimizeLegibility;
 }
 
