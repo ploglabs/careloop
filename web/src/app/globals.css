@@ -45,7 +45,7 @@
   --color-muted-foreground: var(--muted);
   --color-popover: var(--surface);
   --color-popover-foreground: var(--text);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-cal-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -58,6 +58,7 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  font-synthesis-weight: none; /* Cal Sans ships one weight; never fake a bold */
   text-rendering: optimizeLegibility;
 }
 
