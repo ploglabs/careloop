@@ -28,7 +28,7 @@
 
 A post-discharge care layer for clinics and hospital chains. A multilingual voice agent calls patients after they leave, runs a condition-specific check-in, triages what it hears in real time, books follow-up visits during the call, and hands the care team a structured report.
 
-Built for the Gnani AI Great Indian AI Internship Challenge.
+Built for the Gnani AI Great Indian AI Internship Challenge. One-page solution pitch: [PITCH.md](PITCH.md).
 
 > All data in this repository and its demos is synthetic. No real patients, phone numbers, IDs or recordings are used.
 
